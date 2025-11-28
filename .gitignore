@@ -1,0 +1,97 @@
+# =============================================================================
+# Build directories
+# =============================================================================
+build/
+cmake-build-*/
+out/
+bin/
+lib/
+
+# =============================================================================
+# CMake generated files
+# =============================================================================
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+cmake_uninstall.cmake
+Makefile
+*.ninja
+.ninja_*
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# =============================================================================
+# Compiled files
+# =============================================================================
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.pdb
+*.ilk
+*.exp
+
+# =============================================================================
+# IDE and editor files
+# =============================================================================
+# JetBrains (CLion, etc.)
+.idea/
+*.iml
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# OS-specific files
+# =============================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+
+# =============================================================================
+# Application-specific
+# =============================================================================
+# ImGui config (regenerated at runtime)
+imgui.ini
+
+# =============================================================================
+# Misc
+# =============================================================================
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.orig
+

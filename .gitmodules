@@ -1,0 +1,10 @@
+[submodule "source/dependency/glfw"]
+	path = source/dependency/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "source/dependency/glm"]
+	path = source/dependency/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "source/dependency/imgui"]
+	path = source/dependency/imgui
+	url = https://github.com/MustafaAlotbah/imgui.git
+	branch = docking
