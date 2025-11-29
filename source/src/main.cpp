@@ -227,11 +227,7 @@ int main() {
             /* Begin: Shader Controls Window */
             if (show_shader_controls) {
                 ImGui::Begin("Shader Controls", &show_shader_controls);
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                            1000.0f / ImGui::GetIO().Framerate,
-                            ImGui::GetIO().Framerate);
-
-                // renderer.renderProperties();
+                
                 app->onUpdateUI();
 
                 ImGui::End();
@@ -329,6 +325,9 @@ GLFWwindow *createGLFWWindow() {
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+    
+    /* Enable vsync (swap interval = 1) */
+    glfwSwapInterval(1);
 
     return window;
 }

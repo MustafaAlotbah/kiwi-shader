@@ -95,46 +95,17 @@ class ShaderTest : public KiwiCore {
     void onUpdateUI() override {
         // ===== Shader Controls Window =====
         {
-            ImGui::Text("Shader Playground");
-            ImGui::Separator();
+            // FPS Display
+            ImGui::Text("Application: %.1f FPS (%.3f ms/frame)",
+                        ImGui::GetIO().Framerate,
+                        1000.0f / ImGui::GetIO().Framerate);
             
-        // Preset shader selector
-        ImGui::Text("Preset Shaders:");
-        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
-            std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
-            strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
-            addToRecent(path);
-            Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
-            shaderLayer->loadShader(shaderPathBuffer);
-        }
-            
-            ImGui::Spacing();
-            
-            // Custom path input
-            ImGui::Text("Custom Shader Path:");
-            ImGui::InputText("##shaderpath", shaderPathBuffer, sizeof(shaderPathBuffer));
-            
-        ImGui::SameLine();
-        if (ImGui::Button("Load")) {
-            addToRecent(std::string(shaderPathBuffer));
-            shaderLayer->loadShader(shaderPathBuffer);
-        }
-            
-            // Reload button
-            if (ImGui::Button("Force Reload")) {
-                shaderLayer->forceReload();
-            }
-            
-            // Auto-reload toggle
-            bool autoReload = shaderLayer->isAutoReloadEnabled();
-            if (ImGui::Checkbox("Auto-Reload on File Change", &autoReload)) {
-                shaderLayer->setAutoReload(autoReload);
-            }
-            
-            ImGui::Spacing();
             ImGui::Separator();
             
             // ===== Status =====
+            ImGui::Text("Shader Status");
+            ImGui::Separator();
+            
             ImGui::Text("Status:");
             if (shaderLayer->hasValidShader()) {
                 ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Shader Active");
@@ -260,6 +231,18 @@ class ShaderTest : public KiwiCore {
         
         ImGui::Begin("Project", &showProject);
         
+        // ===== Preset Shaders =====
+        ImGui::Text("Preset Shaders:");
+        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
+            std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
+            strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
+            addToRecent(path);
+            Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
+            shaderLayer->loadShader(path);
+        }
+        
+        ImGui::Separator();
+        
         // ===== Current Shader Section =====
         if (ImGui::CollapsingHeader("Current Shader", ImGuiTreeNodeFlags_DefaultOpen)) {
             const std::string& path = shaderLayer->getShaderPath();
@@ -280,26 +263,25 @@ class ShaderTest : public KiwiCore {
                 // Status
                 ImGui::Spacing();
                 if (shaderLayer->hasValidShader()) {
-                    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "● Compiled");
+                    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Compiled");
                 } else {
-                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "● Error");
+                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Error");
                 }
                 
-                ImGui::SameLine();
-                if (shaderLayer->isAutoReloadEnabled()) {
-                    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "◉ Auto-reload");
-                }
-                
-                // Quick actions
+                // Actions row: Reload, Reveal, Auto-reload
                 ImGui::Spacing();
                 if (ImGui::Button("Reload")) {
                     shaderLayer->forceReload();
                 }
-                
                 ImGui::SameLine();
                 if (ImGui::Button("Reveal in Explorer")) {
                     std::string command = "explorer /select,\"" + path + "\"";
                     system(command.c_str());
+                }
+                ImGui::SameLine();
+                bool autoReload = shaderLayer->isAutoReloadEnabled();
+                if (ImGui::Checkbox("Auto-Reload", &autoReload)) {
+                    shaderLayer->setAutoReload(autoReload);
                 }
             } else {
                 ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No shader loaded");
