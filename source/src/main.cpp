@@ -23,8 +23,13 @@
 #include "utility/Layer2D.h"
 #include "utility/Logger.h"
 
-// Global flag for application exit
+// Global flags
 static bool should_exit = false;
+
+// Window visibility flags
+static bool show_shader_controls = true;
+static bool show_viewport = true;
+static bool show_logger = true;
 
 /**
  * @brief Creates a GLFW window with specified settings.
@@ -122,15 +127,23 @@ int main() {
             /* Main menu bar */
             if (ImGui::BeginMainMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
-                    if (ImGui::MenuItem("Exit")) should_exit = true;
+                    if (ImGui::MenuItem("Exit", "Alt+F4")) should_exit = true;
                     ImGui::EndMenu();
                 }
+                
+                if (ImGui::BeginMenu("View")) {
+                    ImGui::MenuItem("Shader Controls", nullptr, &show_shader_controls);
+                    ImGui::MenuItem("Viewport", nullptr, &show_viewport);
+                    ImGui::MenuItem("Logger", nullptr, &show_logger);
+                    ImGui::EndMenu();
+                }
+                
                 ImGui::EndMainMenuBar();
             }
 
-            /* Begin: Custom OpenGL rending window (Properties) */
-            {
-                ImGui::Begin("Properties 1");
+            /* Begin: Shader Controls Window */
+            if (show_shader_controls) {
+                ImGui::Begin("Shader Controls", &show_shader_controls);
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                             1000.0f / ImGui::GetIO().Framerate,
                             ImGui::GetIO().Framerate);
@@ -140,12 +153,12 @@ int main() {
 
                 ImGui::End();
             }
-            /* End: Custom OpenGL rending window (Properties) */
+            /* End: Shader Controls Window */
 
 
-            /* Begin: Custom OpenGL rending window (Rendering) */
-            {
-                ImGui::Begin("Render 2D");
+            /* Begin: Viewport Window */
+            if (show_viewport) {
+                ImGui::Begin("Viewport", &show_viewport);
                 // Do whatever you want here
 
                 ImVec2 windowSize =  ImGui::GetWindowSize();
@@ -169,10 +182,12 @@ int main() {
 
                 ImGui::End();
             }
-            /* End: GL_TRYGL_TRYGL_TRYCustom OpenGL rending window (Rendering) */
+            /* End: Viewport Window */
 
-            // Render the Developer Console bar
-            Logger::onDraw();
+            // Render the Logger window
+            if (show_logger) {
+                Logger::onDraw();
+            }
         }
 
         /* BEGIN: Render ImGui and handle multiple viewports */

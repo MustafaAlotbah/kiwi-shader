@@ -322,7 +322,8 @@ void Logger::loadMonospaceFont() {
 void Logger::draw() {
     ImGui::SetNextWindowSize(ImVec2(800, 300), ImGuiCond_FirstUseEver);
     
-    if (!ImGui::Begin("Logger", nullptr)) {
+    bool* p_open = nullptr;  // Could be passed as parameter if we want close button support
+    if (!ImGui::Begin("Logger", p_open)) {
         ImGui::End();
         return;
     }
