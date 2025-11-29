@@ -10,6 +10,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <map>
+#include <type_traits>
 
 //------------------------------------------------------------------------------
 // Default vertex shader for fullscreen quad
@@ -218,8 +220,39 @@ bool ShaderLayer::loadShader(const std::string& fragmentPath) {
         dependencyModTimes_[dep] = getFileModTime(dep);
     }
 
+    // Save current uniform values before parsing new ones
+    std::map<std::string, Uniforms::UniformVariant> savedValues;
+    for (const auto& uniformVariant : uniforms_.uniforms) {
+        std::visit([&savedValues, &uniformVariant](const auto& uniform) {
+            savedValues[uniform.name] = uniformVariant;
+        }, uniformVariant);
+    }
+    
     // Parse annotated uniforms from preprocessed source
     uniforms_ = Uniforms::UniformParser::parse(fragmentSrc);
+    
+    // Restore previous values for uniforms that still exist (preserve user tweaks!)
+    for (auto& uniformVariant : uniforms_.uniforms) {
+        std::visit([&savedValues, &uniformVariant](auto& uniform) {
+            auto it = savedValues.find(uniform.name);
+            if (it != savedValues.end()) {
+                // Check if types match before restoring
+                if (uniformVariant.index() == it->second.index()) {
+                    // Copy the saved variant value by visiting it
+                    std::visit([&uniform](const auto& savedUniform) {
+                        using T = std::decay_t<decltype(savedUniform)>;
+                        using U = std::decay_t<decltype(uniform)>;
+                        if constexpr (std::is_same_v<T, U>) {
+                            uniform.value = savedUniform.value;
+                        }
+                    }, it->second);
+                    Logger::Debug("ShaderLayer", "Preserved value for uniform: " + uniform.name, {"shader", "hotreload"});
+                } else {
+                    Logger::Debug("ShaderLayer", "Type changed for uniform: " + uniform.name + ", using default", {"shader", "hotreload"});
+                }
+            }
+        }, uniformVariant);
+    }
     
     // Update uniform locations for the new shader program
     Uniforms::UniformEditor::updateLocations(uniforms_, shaderProgram_);
