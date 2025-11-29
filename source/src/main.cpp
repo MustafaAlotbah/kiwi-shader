@@ -13,12 +13,18 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
+#include <algorithm>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <windows.h>
 
 #include "utility/Layer2D.h"
 #include "utility/Logger.h"
@@ -30,6 +36,62 @@ static bool should_exit = false;
 static bool show_shader_controls = true;
 static bool show_viewport = true;
 static bool show_logger = true;
+
+// Recent files
+static std::vector<std::string> recent_files;
+static const size_t MAX_RECENT_FILES = 10;
+
+// File to open (set by menu, processed in main loop)
+static std::string pending_file_to_open = "";
+
+/**
+ * @brief Opens a Windows file dialog to select a shader file
+ * @param window The GLFW window (for modal dialog)
+ * @return Selected file path, or empty string if cancelled
+ */
+std::string openFileDialog(GLFWwindow* window) {
+    HWND hwnd = glfwGetWin32Window(window);
+    
+    OPENFILENAMEA ofn;
+    char szFile[260] = {0};
+    
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "GLSL Shaders\0*.frag;*.vert;*.glsl\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = nullptr;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = nullptr;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+    
+    if (GetOpenFileNameA(&ofn) == TRUE) {
+        return std::string(ofn.lpstrFile);
+    }
+    
+    return "";
+}
+
+/**
+ * @brief Adds a file to the recent files list
+ */
+void addToRecentFiles(const std::string& path) {
+    // Remove if already exists
+    auto it = std::find(recent_files.begin(), recent_files.end(), path);
+    if (it != recent_files.end()) {
+        recent_files.erase(it);
+    }
+    
+    // Add to front
+    recent_files.insert(recent_files.begin(), path);
+    
+    // Trim to max size
+    if (recent_files.size() > MAX_RECENT_FILES) {
+        recent_files.resize(MAX_RECENT_FILES);
+    }
+}
 
 /**
  * @brief Creates a GLFW window with specified settings.
@@ -127,6 +189,40 @@ int main() {
             /* Main menu bar */
             if (ImGui::BeginMainMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
+                    if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+                        std::string filePath = openFileDialog(window);
+                        if (!filePath.empty()) {
+                            pending_file_to_open = filePath;
+                        }
+                    }
+                    
+                    if (ImGui::BeginMenu("Open Recent", !recent_files.empty())) {
+                        for (size_t i = 0; i < recent_files.size(); ++i) {
+                            const auto& file = recent_files[i];
+                            // Extract filename for display
+                            size_t lastSlash = file.find_last_of("/\\");
+                            std::string displayName = (lastSlash != std::string::npos) 
+                                ? file.substr(lastSlash + 1) 
+                                : file;
+                            
+                            if (ImGui::MenuItem(displayName.c_str())) {
+                                pending_file_to_open = file;
+                            }
+                            
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", file.c_str());
+                            }
+                        }
+                        
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("Clear Recent Files")) {
+                            recent_files.clear();
+                        }
+                        
+                        ImGui::EndMenu();
+                    }
+                    
+                    ImGui::Separator();
                     if (ImGui::MenuItem("Exit", "Alt+F4")) should_exit = true;
                     ImGui::EndMenu();
                 }
@@ -139,6 +235,13 @@ int main() {
                 }
                 
                 ImGui::EndMainMenuBar();
+            }
+            
+            // Process pending file open (from menu)
+            if (!pending_file_to_open.empty()) {
+                app->loadShaderFromMenu(pending_file_to_open);
+                addToRecentFiles(pending_file_to_open);
+                pending_file_to_open = "";
             }
 
             /* Begin: Shader Controls Window */

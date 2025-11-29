@@ -572,6 +572,7 @@ public: // API overrides
     virtual void onLoad() = 0;
     virtual void onUpdate(float time, float deltaTime) = 0;
     virtual void onUpdateUI() = 0;
+    virtual void loadShaderFromMenu(const std::string& path) { /* Default: do nothing */ }
 public:
     KIWI_API void addLayer(std::shared_ptr<KiwiLayer> layer);
 private:

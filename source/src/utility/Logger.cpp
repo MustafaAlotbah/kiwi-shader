@@ -45,7 +45,7 @@ ImVec4 LogMessage::getColor() const {
         case LogLevel::DEBUG:  return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);  // Light Blue
         case LogLevel::INFO:   return ImVec4(0.8f, 0.8f, 0.8f, 1.0f);  // White
         case LogLevel::WARN:   return ImVec4(1.0f, 0.8f, 0.0f, 1.0f);  // Yellow/Orange
-        case LogLevel::ERROR:  return ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  // Red
+        case LogLevel::ERR:    return ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  // Red
         default:               return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }
@@ -56,7 +56,7 @@ const char* LogMessage::getLevelName() const {
         case LogLevel::DEBUG:  return "DEBUG";
         case LogLevel::INFO:   return "INFO ";  // Padded to 5 chars
         case LogLevel::WARN:   return "WARN ";  // Padded to 5 chars
-        case LogLevel::ERROR:  return "ERROR";
+        case LogLevel::ERR:    return "ERROR";
         default:               return "UNKNOWN";
     }
 }
@@ -67,7 +67,7 @@ const char* LogMessage::getLevelIcon() const {
         case LogLevel::DEBUG:  return "*";  // Asterisk
         case LogLevel::INFO:   return "i";  // Info
         case LogLevel::WARN:   return "!";  // Exclamation
-        case LogLevel::ERROR:  return "X";  // X/Cross
+        case LogLevel::ERR:    return "X";  // X/Cross
         default:               return "?";
     }
 }
@@ -127,7 +127,7 @@ void Logger::Warn(const std::string& source, const std::string& message, const s
 }
 
 void Logger::Error(const std::string& source, const std::string& message, const std::vector<std::string>& tags) {
-    getInstance().addLogMessage(LogLevel::ERROR, source, message, tags);
+    getInstance().addLogMessage(LogLevel::ERR, source, message, tags);
 }
 
 // Legacy API (backwards compatibility)
@@ -188,7 +188,7 @@ void Logger::updateStats() {
             case LogLevel::DEBUG: countDebug_++; break;
             case LogLevel::INFO:  countInfo_++;  break;
             case LogLevel::WARN:  countWarn_++;  break;
-            case LogLevel::ERROR: countError_++; break;
+            case LogLevel::ERR:   countError_++; break;
         }
     }
 }

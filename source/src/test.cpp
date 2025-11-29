@@ -1,12 +1,15 @@
 
 #include <format>
 #include <filesystem>
+#include <cstdlib>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 #include "utility/Layer2D.h"
 #include "utility/ShaderLayer.h"
 #include "utility/UniformEditor.h"
 #include "utility/Logger.h"
-
 
 // ShaderTest class - demonstrates the ShaderLayer with hot-reload and uniform controls
 class ShaderTest : public KiwiCore {
@@ -24,6 +27,9 @@ class ShaderTest : public KiwiCore {
         "example_with_includes.frag"
     };
     bool showShaderParameters = true;
+    bool showProject = true;
+    std::vector<std::string> recentShaders;  // Local recent files list
+    static const size_t MAX_RECENT = 5;
 
     void onLoad() override {
         addLayer(shaderLayer);
@@ -46,20 +52,56 @@ class ShaderTest : public KiwiCore {
         // ShaderLayer handles its own updates including hot-reload
     }
 
+    void loadShaderFromMenu(const std::string& path) override {
+        strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
+        shaderPathBuffer[sizeof(shaderPathBuffer) - 1] = '\0';
+        
+        // Find matching preset (if any)
+        for (int i = 0; i < 5; ++i) {
+            if (path.find(shaderOptions[i]) != std::string::npos) {
+                selectedShader = i;
+                break;
+            }
+        }
+        
+        // Add to recent list
+        addToRecent(path);
+        
+        Logger::Info("ShaderTest", "Opening shader from file dialog: " + path, {"ui", "io"});
+        shaderLayer->loadShader(path);
+    }
+    
+    void addToRecent(const std::string& path) {
+        // Remove if already exists
+        auto it = std::find(recentShaders.begin(), recentShaders.end(), path);
+        if (it != recentShaders.end()) {
+            recentShaders.erase(it);
+        }
+        
+        // Add to front
+        recentShaders.insert(recentShaders.begin(), path);
+        
+        // Trim to max size
+        if (recentShaders.size() > MAX_RECENT) {
+            recentShaders.resize(MAX_RECENT);
+        }
+    }
+    
     void onUpdateUI() override {
         // ===== Shader Controls Window =====
         {
             ImGui::Text("Shader Playground");
             ImGui::Separator();
             
-            // Preset shader selector
-            ImGui::Text("Preset Shaders:");
-            if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
-                std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
-                strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
-                Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
-                shaderLayer->loadShader(shaderPathBuffer);
-            }
+        // Preset shader selector
+        ImGui::Text("Preset Shaders:");
+        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
+            std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
+            strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
+            addToRecent(path);
+            Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
+            shaderLayer->loadShader(shaderPathBuffer);
+        }
             
             ImGui::Spacing();
             
@@ -67,10 +109,11 @@ class ShaderTest : public KiwiCore {
             ImGui::Text("Custom Shader Path:");
             ImGui::InputText("##shaderpath", shaderPathBuffer, sizeof(shaderPathBuffer));
             
-            ImGui::SameLine();
-            if (ImGui::Button("Load")) {
-                shaderLayer->loadShader(shaderPathBuffer);
-            }
+        ImGui::SameLine();
+        if (ImGui::Button("Load")) {
+            addToRecent(std::string(shaderPathBuffer));
+            shaderLayer->loadShader(shaderPathBuffer);
+        }
             
             // Reload button
             if (ImGui::Button("Force Reload")) {
@@ -130,6 +173,8 @@ class ShaderTest : public KiwiCore {
             if (ImGui::CollapsingHeader("View Options")) {
                 auto& uniforms = shaderLayer->getUniforms();
                 
+                ImGui::Checkbox("Show Project Window", &showProject);
+                
                 // Only show if we have parameters
                 if (!uniforms.empty()) {
                     ImGui::Checkbox("Show Shader Parameters", &showShaderParameters);
@@ -177,6 +222,9 @@ class ShaderTest : public KiwiCore {
             }
         }
         
+        // ===== Project Window (separate) =====
+        renderProjectWindow();
+        
         // ===== Shader Parameters Window (separate) =====
         auto& uniforms = shaderLayer->getUniforms();
         if (!uniforms.empty() && showShaderParameters) {
@@ -200,6 +248,123 @@ class ShaderTest : public KiwiCore {
             
             ImGui::End();
         }
+    }
+    
+    void renderProjectWindow() {
+        if (!showProject) return;
+        
+        ImGui::Begin("Project", &showProject);
+        
+        // ===== Current Shader Section =====
+        if (ImGui::CollapsingHeader("Current Shader", ImGuiTreeNodeFlags_DefaultOpen)) {
+            const std::string& path = shaderLayer->getShaderPath();
+            
+            if (!path.empty()) {
+                // Extract filename
+                std::filesystem::path shaderPath(path);
+                std::string filename = shaderPath.filename().string();
+                std::string directory = shaderPath.parent_path().string();
+                
+                ImGui::Text("File:");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", filename.c_str());
+                
+                ImGui::Text("Path:");
+                ImGui::TextWrapped("%s", directory.c_str());
+                
+                // Status
+                ImGui::Spacing();
+                if (shaderLayer->hasValidShader()) {
+                    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "● Compiled");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "● Error");
+                }
+                
+                ImGui::SameLine();
+                if (shaderLayer->isAutoReloadEnabled()) {
+                    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "◉ Auto-reload");
+                }
+                
+                // Quick actions
+                ImGui::Spacing();
+                if (ImGui::Button("Reload")) {
+                    shaderLayer->forceReload();
+                }
+                
+                ImGui::SameLine();
+                if (ImGui::Button("Reveal in Explorer")) {
+                    std::string command = "explorer /select,\"" + path + "\"";
+                    system(command.c_str());
+                }
+            } else {
+                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No shader loaded");
+            }
+        }
+        
+        // ===== Include Files Section =====
+        const auto& deps = shaderLayer->getDependencies();
+        if (!deps.empty()) {
+            if (ImGui::CollapsingHeader("Include Files", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("Dependencies: %zu file(s)", deps.size());
+                ImGui::Separator();
+                
+                for (const auto& dep : deps) {
+                    std::filesystem::path depPath(dep);
+                    std::string filename = depPath.filename().string();
+                    
+                    ImGui::BulletText("%s", filename.c_str());
+                    
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s\nClick to open in default editor", dep.c_str());
+                    }
+                    
+                    if (ImGui::IsItemClicked()) {
+                        std::string command = "start \"\" \"" + dep + "\"";
+                        system(command.c_str());
+                    }
+                }
+            }
+        }
+        
+        // ===== Shader Statistics =====
+        if (shaderLayer->hasValidShader()) {
+            if (ImGui::CollapsingHeader("Statistics")) {
+                auto& uniforms = shaderLayer->getUniforms();
+                
+                ImGui::Text("Annotated Uniforms: %zu", uniforms.size());
+                ImGui::Text("Include Files: %zu", deps.size());
+                
+                // Could add more stats: line count, etc.
+            }
+        }
+        
+        // ===== Recent Files Section =====
+        if (!recentShaders.empty()) {
+            if (ImGui::CollapsingHeader("Recent Files")) {
+                for (size_t i = 0; i < recentShaders.size(); ++i) {
+                    const auto& file = recentShaders[i];
+                    std::filesystem::path filePath(file);
+                    std::string filename = filePath.filename().string();
+                    
+                    // Clickable recent file
+                    ImGui::PushID(static_cast<int>(i));
+                    if (ImGui::Selectable(filename.c_str())) {
+                        // Load this shader directly
+                        strncpy(shaderPathBuffer, file.c_str(), sizeof(shaderPathBuffer) - 1);
+                        shaderPathBuffer[sizeof(shaderPathBuffer) - 1] = '\0';
+                        shaderLayer->loadShader(file);
+                        Logger::Info("ShaderTest", "Loaded shader from recent: " + filename, {"ui", "shader"});
+                    }
+                    ImGui::PopID();
+                    
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", file.c_str());
+                    }
+                }
+            }
+        }
+        
+        ImGui::End();
     }
 };
 
