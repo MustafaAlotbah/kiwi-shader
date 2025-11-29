@@ -195,7 +195,14 @@ bool ShaderLayer::loadShader(const std::string& fragmentPath) {
         glDeleteProgram(shaderProgram_);
     }
     shaderProgram_ = result.programId;
+    shaderSource_ = fragmentSrc;
     lastModTime_ = getFileModTime(fragmentPath);
+
+    // Parse annotated uniforms from shader source
+    uniforms_ = Uniforms::UniformParser::parse(fragmentSrc);
+    
+    // Update uniform locations for the new shader program
+    Uniforms::UniformEditor::updateLocations(uniforms_, shaderProgram_);
 
     Logger::Log("Shader loaded successfully: " + fragmentPath);
     return true;
@@ -220,6 +227,10 @@ bool ShaderLayer::forceReload() {
         return false;
     }
     return loadShader(shaderPath_);
+}
+
+void ShaderLayer::resetUniforms() {
+    Uniforms::UniformEditor::resetToDefaults(uniforms_);
 }
 
 //------------------------------------------------------------------------------
@@ -265,6 +276,9 @@ void ShaderLayer::render(float windowWidth, float windowHeight, double time, dou
         }
     }
 
+    // Bind custom annotated uniforms
+    Uniforms::UniformEditor::bindUniforms(uniforms_, shaderProgram_);
+
     // Draw fullscreen quad
     GL_TRY(glBindVertexArray(quadVAO_));
     GL_TRY(glDrawArrays(GL_TRIANGLES, 0, 6));
@@ -286,4 +300,3 @@ void ShaderLayer::handleMouseEvent(MouseEvent mouseEvent) {
         mouseDown_ = false;
     }
 }
-

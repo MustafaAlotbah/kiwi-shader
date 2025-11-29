@@ -1,13 +1,13 @@
 
-
 #include <format>
 
 #include "utility/Layer2D.h"
 #include "utility/ShaderLayer.h"
+#include "utility/UniformEditor.h"
 #include "utility/Logger.h"
 
 
-// ShaderTest class - demonstrates the ShaderLayer with hot-reload
+// ShaderTest class - demonstrates the ShaderLayer with hot-reload and uniform controls
 class ShaderTest : public KiwiCore {
 
     std::shared_ptr<ShaderLayer> shaderLayer = std::make_shared<ShaderLayer>();
@@ -15,18 +15,20 @@ class ShaderTest : public KiwiCore {
     // UI state
     char shaderPathBuffer[512] = "";
     int selectedShader = 0;
-    const char* shaderOptions[3] = {
+    const char* shaderOptions[4] = {
         "default.frag",
         "plasma.frag",
-        "raymarching.frag"
+        "raymarching.frag",
+        "annotated_demo.frag"
     };
 
     void onLoad() override {
         addLayer(shaderLayer);
         
-        // Set default shader path
-        std::string defaultPath = std::string(ASSETS_PATH) + "/shaders/default.frag";
+        // Set default shader path - use the annotated demo to show off the feature
+        std::string defaultPath = std::string(ASSETS_PATH) + "/shaders/annotated_demo.frag";
         strncpy(shaderPathBuffer, defaultPath.c_str(), sizeof(shaderPathBuffer) - 1);
+        selectedShader = 3;  // annotated_demo.frag
         
         // Load the default shader
         shaderLayer->loadShader(shaderPathBuffer);
@@ -43,7 +45,7 @@ class ShaderTest : public KiwiCore {
         
         // Preset shader selector
         ImGui::Text("Preset Shaders:");
-        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 3)) {
+        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 4)) {
             std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
             strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
             shaderLayer->loadShader(shaderPathBuffer);
@@ -85,6 +87,25 @@ class ShaderTest : public KiwiCore {
         // Show current shader path
         ImGui::Text("Current: %s", shaderLayer->getShaderPath().c_str());
         
+        // ===== Custom Uniform Controls =====
+        auto& uniforms = shaderLayer->getUniforms();
+        if (!uniforms.empty()) {
+            ImGui::Spacing();
+            ImGui::Separator();
+            
+            if (ImGui::CollapsingHeader("Shader Parameters", ImGuiTreeNodeFlags_DefaultOpen)) {
+                // Reset button
+                if (ImGui::Button("Reset All to Defaults")) {
+                    shaderLayer->resetUniforms();
+                }
+                
+                ImGui::Spacing();
+                
+                // Render uniform controls
+                Uniforms::UniformEditor::renderControls(uniforms);
+            }
+        }
+        
         // ===== Error Display =====
         const std::string& error = shaderLayer->getLastError();
         if (!error.empty()) {
@@ -107,24 +128,34 @@ class ShaderTest : public KiwiCore {
             glm::vec2 mouse = shaderLayer->getMousePosition();
             ImGui::Text("Mouse (normalized): %.3f, %.3f", mouse.x, mouse.y);
             ImGui::Text("Mouse Down: %s", shaderLayer->isMouseDown() ? "Yes" : "No");
+            ImGui::Text("Parsed Uniforms: %zu", uniforms.size());
         }
         
         ImGui::Spacing();
         ImGui::Separator();
         
         // ===== Help =====
-        if (ImGui::CollapsingHeader("Shader Uniforms Help")) {
+        if (ImGui::CollapsingHeader("Annotation Syntax")) {
+            ImGui::TextWrapped("Add annotations before uniform declarations:");
+            ImGui::Spacing();
+            
+            ImGui::BulletText("@slider(min=0.0, max=1.0, default=0.5)");
+            ImGui::BulletText("@color(default=1.0,0.5,0.0)");
+            ImGui::BulletText("@checkbox(default=true)");
+            ImGui::BulletText("@vec2(default=0.5,0.5)");
+            ImGui::BulletText("@vec3(default=1.0,0.0,0.0)");
+            
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Example:");
+            ImGui::TextWrapped("// @slider(min=0.0, max=10.0, default=1.0)\nuniform float uSpeed;");
+        }
+        
+        if (ImGui::CollapsingHeader("Built-in Uniforms")) {
             ImGui::BulletText("iTime - playback time (seconds)");
             ImGui::BulletText("iTimeDelta - frame delta time");
             ImGui::BulletText("iResolution - viewport size (vec3)");
             ImGui::BulletText("iMouse - mouse state (vec4)");
             ImGui::BulletText("fragCoord - UV coords [0,1]");
-            
-            ImGui::Spacing();
-            ImGui::TextWrapped(
-                "Edit the shader file externally and save - "
-                "it will hot-reload automatically!"
-            );
         }
     }
 };
@@ -133,4 +164,3 @@ class ShaderTest : public KiwiCore {
 // Registering ShaderTest app with the KiwiAppFactory
 static bool isMyKiwiAppRegistered = KiwiAppFactory::getInstance()
         .registerApp("MyKiwiApp", []() -> KiwiCore* { return new ShaderTest(); });
-

@@ -20,6 +20,9 @@
 #include <glm/glm.hpp>
 
 #include "utility/Layer2D.h"
+#include "utility/UniformTypes.h"
+#include "utility/UniformParser.h"
+#include "utility/UniformEditor.h"
 
 /**
  * @brief Result of a shader compilation attempt.
@@ -51,6 +54,8 @@ private:
  * - iResolution: viewport resolution (in pixels)
  * - iMouse: mouse position and click state
  * - iTimeDelta: time since last frame
+ *
+ * Also supports annotated custom uniforms parsed from shader source.
  */
 class ShaderLayer : public KiwiLayer {
 public:
@@ -113,6 +118,22 @@ public:
      */
     [[nodiscard]] bool isMouseDown() const { return mouseDown_; }
 
+    /**
+     * @brief Get the collection of parsed custom uniforms.
+     */
+    [[nodiscard]] Uniforms::UniformCollection& getUniforms() { return uniforms_; }
+    [[nodiscard]] const Uniforms::UniformCollection& getUniforms() const { return uniforms_; }
+
+    /**
+     * @brief Reset all custom uniforms to their default values.
+     */
+    void resetUniforms();
+
+    /**
+     * @brief Get the current shader program ID.
+     */
+    [[nodiscard]] unsigned int getProgramId() const { return shaderProgram_; }
+
 private:
     // Shader compilation
     ShaderCompileResult tryCompileShader(const std::string& vertexSrc, const std::string& fragmentSrc);
@@ -133,9 +154,13 @@ private:
 
     // Shader file tracking
     std::string shaderPath_;
+    std::string shaderSource_;  // Cached source for parsing
     std::filesystem::file_time_type lastModTime_;
     std::string lastError_;
     bool autoReload_ = true;
+
+    // Custom uniforms parsed from annotations
+    Uniforms::UniformCollection uniforms_;
 
     // Camera (minimal implementation)
     ShaderCamera camera_;
@@ -148,4 +173,3 @@ private:
     // Resolution tracking
     glm::vec2 resolution_{1.0f, 1.0f};
 };
-

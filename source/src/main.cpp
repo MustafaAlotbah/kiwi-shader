@@ -171,12 +171,6 @@ int main() {
             }
             /* End: GL_TRYGL_TRYGL_TRYCustom OpenGL rending window (Rendering) */
 
-            // Show ImGui demo window
-            {
-                static bool show = true;
-                ImGui::ShowDemoWindow(&show);
-            }
-
             // Render the Developer Console bar
             Logger::onDraw();
         }
