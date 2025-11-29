@@ -138,6 +138,12 @@ public:
      * @brief Get list of shader dependencies (included files).
      */
     [[nodiscard]] const std::vector<std::string>& getDependencies() const { return shaderDependencies_; }
+    
+    /**
+     * @brief Get the last GPU frame time in milliseconds.
+     * @return GPU time to render the last frame (0.0 if not available yet)
+     */
+    [[nodiscard]] double getGpuFrameTime() const { return gpuFrameTime_; }
 
 private:
     // Shader compilation
@@ -181,4 +187,9 @@ private:
 
     // Resolution tracking
     glm::vec2 resolution_{1.0f, 1.0f};
+    
+    // GPU performance profiling
+    unsigned int gpuTimerQueries_[2] = {0, 0};  // Double-buffered queries to avoid stalls
+    int currentQuery_ = 0;
+    double gpuFrameTime_ = 0.0;  // In milliseconds
 };

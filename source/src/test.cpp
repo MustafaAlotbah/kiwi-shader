@@ -130,6 +130,34 @@ class ShaderTest : public KiwiCore {
             ImGui::Text("| Px: %.0f, %.0f", mousePixel.x, mousePixel.y);
         });
         
+        // Widget: GPU Frame Time (smart unit formatting)
+        statusBar.addWidget("gpu_time", [this]() {
+            ImGui::Text("|");
+            ImGui::SameLine();
+            double gpuTime = shaderLayer->getGpuFrameTime();
+            if (gpuTime > 0.0) {
+                // Color-code based on performance (60 FPS = 16.67ms)
+                ImVec4 color;
+                if (gpuTime < 16.67) {
+                    color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); // Green (good)
+                } else if (gpuTime < 33.33) {
+                    color = ImVec4(1.0f, 0.9f, 0.4f, 1.0f); // Yellow (okay)
+                } else {
+                    color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Red (slow)
+                }
+                
+                // Smart unit formatting: us for < 9ms, ms otherwise
+                if (gpuTime < 9.0) {
+                    double microSeconds = gpuTime * 1000.0; // Convert ms to μs
+                    ImGui::TextColored(color, "GPU: %.0f us", microSeconds);
+                } else {
+                    ImGui::TextColored(color, "GPU: %.2f ms", gpuTime);
+                }
+            } else {
+                ImGui::Text("GPU: --");
+            }
+        });
+        
         // Widget: Resolution
         statusBar.addWidget("resolution", [this]() {
             ImGui::Text("|");

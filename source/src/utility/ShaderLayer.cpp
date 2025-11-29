@@ -33,7 +33,11 @@ const char* ShaderLayer::getDefaultVertexShader() {
 //------------------------------------------------------------------------------
 ShaderLayer::ShaderLayer() {
     setupFullscreenQuad();
-    Logger::Info("ShaderLayer", "Initialized", {"graphics", "shader"});
+    
+    // Create GPU timer queries for performance profiling
+    glGenQueries(2, gpuTimerQueries_);
+    
+    Logger::Info("ShaderLayer", "Initialized with GPU profiling", {"graphics", "shader"});
 }
 
 ShaderLayer::~ShaderLayer() {
@@ -45,6 +49,9 @@ ShaderLayer::~ShaderLayer() {
     }
     if (quadVBO_ != 0) {
         glDeleteBuffers(1, &quadVBO_);
+    }
+    if (gpuTimerQueries_[0] != 0) {
+        glDeleteQueries(2, gpuTimerQueries_);
     }
 }
 
@@ -286,8 +293,22 @@ void ShaderLayer::render(float windowWidth, float windowHeight, double time, dou
     if (shaderProgram_ == 0) {
         glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+        gpuFrameTime_ = 0.0;
         return;
     }
+    
+    // Read results from previous frame (non-blocking)
+    int previousQuery = 1 - currentQuery_;
+    GLint available = 0;
+    glGetQueryObjectiv(gpuTimerQueries_[previousQuery], GL_QUERY_RESULT_AVAILABLE, &available);
+    if (available) {
+        GLuint64 timeElapsed = 0;
+        glGetQueryObjectui64v(gpuTimerQueries_[previousQuery], GL_QUERY_RESULT, &timeElapsed);
+        gpuFrameTime_ = static_cast<double>(timeElapsed) / 1000000.0; // Convert nanoseconds to milliseconds
+    }
+    
+    // Start GPU timer for this frame
+    glBeginQuery(GL_TIME_ELAPSED, gpuTimerQueries_[currentQuery_]);
 
     // Use shader and set uniforms
     GL_TRY(glUseProgram(shaderProgram_));
@@ -323,6 +344,12 @@ void ShaderLayer::render(float windowWidth, float windowHeight, double time, dou
     GL_TRY(glBindVertexArray(quadVAO_));
     GL_TRY(glDrawArrays(GL_TRIANGLES, 0, 6));
     GL_TRY(glBindVertexArray(0));
+    
+    // End GPU timer
+    glEndQuery(GL_TIME_ELAPSED);
+    
+    // Swap query buffers for next frame
+    currentQuery_ = 1 - currentQuery_;
 }
 
 //------------------------------------------------------------------------------
