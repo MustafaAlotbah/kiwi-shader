@@ -4,6 +4,7 @@
  */
 
 #include "utility/ShaderLayer.h"
+#include "utility/ShaderPreprocessor.h"
 #include "utility/common.h"
 #include "utility/Logger.h"
 
@@ -173,13 +174,19 @@ bool ShaderLayer::loadShader(const std::string& fragmentPath) {
         return false;
     }
 
-    // Load fragment shader source
-    std::string fragmentSrc = loadFileContents(fragmentPath);
-    if (fragmentSrc.empty()) {
-        lastError_ = "Failed to read file: " + fragmentPath;
+    // Preprocess shader (handles #include directives)
+    auto preprocessResult = ShaderPreprocessing::ShaderPreprocessor::process(fragmentPath);
+    
+    if (!preprocessResult.success) {
+        lastError_ = "Preprocessing failed: " + preprocessResult.errorMessage;
         Logger::Error(lastError_);
         return false;
     }
+    
+    std::string fragmentSrc = preprocessResult.source;
+    
+    // Store dependencies for hot-reload tracking
+    shaderDependencies_ = preprocessResult.dependencies;
 
     // Try to compile
     ShaderCompileResult result = tryCompileShader(getDefaultVertexShader(), fragmentSrc);
@@ -197,14 +204,29 @@ bool ShaderLayer::loadShader(const std::string& fragmentPath) {
     shaderProgram_ = result.programId;
     shaderSource_ = fragmentSrc;
     lastModTime_ = getFileModTime(fragmentPath);
+    
+    // Update dependency mod times
+    dependencyModTimes_.clear();
+    for (const auto& dep : shaderDependencies_) {
+        dependencyModTimes_[dep] = getFileModTime(dep);
+    }
 
-    // Parse annotated uniforms from shader source
+    // Parse annotated uniforms from preprocessed source
     uniforms_ = Uniforms::UniformParser::parse(fragmentSrc);
     
     // Update uniform locations for the new shader program
     Uniforms::UniformEditor::updateLocations(uniforms_, shaderProgram_);
 
     Logger::Log("Shader loaded successfully: " + fragmentPath);
+    if (!shaderDependencies_.empty()) {
+        Logger::Log("  Dependencies (" + std::to_string(shaderDependencies_.size()) + " file(s)):");
+        for (const auto& dep : shaderDependencies_) {
+            // Get just the filename for cleaner logging
+            std::filesystem::path depPath(dep);
+            Logger::Log("    - " + depPath.filename().string() + " (" + depPath.parent_path().filename().string() + ")");
+        }
+        Logger::Log("  Hot-reload enabled for all dependencies");
+    }
     return true;
 }
 
@@ -213,11 +235,28 @@ bool ShaderLayer::checkAndReload() {
         return false;
     }
 
+    // Check main shader file
     auto currentModTime = getFileModTime(shaderPath_);
     if (currentModTime != lastModTime_) {
         Logger::Log("Shader file changed, reloading...");
         return loadShader(shaderPath_);
     }
+    
+    // Check all dependencies (included files)
+    for (const auto& dep : shaderDependencies_) {
+        auto it = dependencyModTimes_.find(dep);
+        if (it != dependencyModTimes_.end()) {
+            auto currentDepModTime = getFileModTime(dep);
+            if (currentDepModTime != it->second) {
+                std::filesystem::path depPath(dep);
+                Logger::Log("Include file modified: " + depPath.filename().string());
+                Logger::Log("  Full path: " + dep);
+                Logger::Log("Reloading shader...");
+                return loadShader(shaderPath_);
+            }
+        }
+    }
+    
     return false;
 }
 

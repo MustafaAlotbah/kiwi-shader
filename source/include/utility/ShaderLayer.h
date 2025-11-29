@@ -133,6 +133,11 @@ public:
      * @brief Get the current shader program ID.
      */
     [[nodiscard]] unsigned int getProgramId() const { return shaderProgram_; }
+    
+    /**
+     * @brief Get list of shader dependencies (included files).
+     */
+    [[nodiscard]] const std::vector<std::string>& getDependencies() const { return shaderDependencies_; }
 
 private:
     // Shader compilation
@@ -158,6 +163,10 @@ private:
     std::filesystem::file_time_type lastModTime_;
     std::string lastError_;
     bool autoReload_ = true;
+    
+    // Include file tracking for hot-reload
+    std::vector<std::string> shaderDependencies_;
+    std::unordered_map<std::string, std::filesystem::file_time_type> dependencyModTimes_;
 
     // Custom uniforms parsed from annotations
     Uniforms::UniformCollection uniforms_;

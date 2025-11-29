@@ -1,5 +1,6 @@
 
 #include <format>
+#include <filesystem>
 
 #include "utility/Layer2D.h"
 #include "utility/ShaderLayer.h"
@@ -15,11 +16,12 @@ class ShaderTest : public KiwiCore {
     // UI state
     char shaderPathBuffer[512] = "";
     int selectedShader = 0;
-    const char* shaderOptions[4] = {
+    const char* shaderOptions[5] = {
         "default.frag",
         "plasma.frag",
         "raymarching.frag",
-        "annotated_demo.frag"
+        "annotated_demo.frag",
+        "example_with_includes.frag"
     };
 
     void onLoad() override {
@@ -45,7 +47,7 @@ class ShaderTest : public KiwiCore {
         
         // Preset shader selector
         ImGui::Text("Preset Shaders:");
-        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 4)) {
+        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
             std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
             strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
             shaderLayer->loadShader(shaderPathBuffer);
@@ -86,6 +88,19 @@ class ShaderTest : public KiwiCore {
         
         // Show current shader path
         ImGui::Text("Current: %s", shaderLayer->getShaderPath().c_str());
+        
+        // Show dependencies
+        const auto& deps = shaderLayer->getDependencies();
+        if (!deps.empty()) {
+            ImGui::Text("Includes: %zu file(s)", deps.size());
+            if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+                for (const auto& dep : deps) {
+                    std::filesystem::path depPath(dep);
+                    ImGui::BulletText("%s", depPath.filename().string().c_str());
+                }
+                ImGui::EndTooltip();
+            }
+        }
         
         // ===== Custom Uniform Controls =====
         auto& uniforms = shaderLayer->getUniforms();
