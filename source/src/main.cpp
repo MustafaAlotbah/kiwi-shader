@@ -30,6 +30,7 @@
 #include "utility/Logger.h"
 #include "utility/SettingsManager.h"
 #include "utility/FullscreenQuad.h"
+#include "utility/StatusBar.h"
 
 // Global flags
 static bool should_exit = false;
@@ -257,8 +258,31 @@ int main() {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            // ImGui docking space
-            ImGui::DockSpaceOverViewport();
+            // ImGui docking space with reserved space for status bar at bottom
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
+            
+            // Reserve space at the bottom for status bar
+            ImVec2 workPos = viewport->WorkPos;
+            ImVec2 workSize = viewport->WorkSize;
+            workSize.y -= StatusBar::getHeight(); // Reduce dockspace height to leave room for status bar
+            
+            ImGui::SetNextWindowPos(workPos);
+            ImGui::SetNextWindowSize(workSize);
+            ImGui::SetNextWindowViewport(viewport->ID);
+            
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                                           ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                           ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+                                           ImGuiWindowFlags_NoBackground;
+            
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+            ImGui::Begin("DockSpace", nullptr, window_flags);
+            ImGui::PopStyleVar();
+            
+            ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+            ImGui::End();
 
             /* Window Rendering */
             {
@@ -365,6 +389,9 @@ int main() {
                 if (show_logger) {
                     Logger::onDraw();
                 }
+                
+                // Render the Status Bar (always at the bottom)
+                StatusBar::getInstance().render();
             }
 
             /* BEGIN: Render ImGui and handle multiple viewports */
@@ -415,7 +442,7 @@ GLFWwindow *createGLFWWindow() {
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 
     /* Create a windowed mode window and its OpenGL context */
-    GLFWwindow *window = glfwCreateWindow(1480, 960, PROJECT_NAME, nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(1480, 960, "Kiwi Shader", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return nullptr;

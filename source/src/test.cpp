@@ -11,6 +11,7 @@
 #include "utility/UniformEditor.h"
 #include "utility/Logger.h"
 #include "utility/SettingsManager.h"
+#include "utility/StatusBar.h"
 
 // ShaderTest class - demonstrates the ShaderLayer with hot-reload and uniform controls
 class ShaderTest : public KiwiCore {
@@ -62,6 +63,47 @@ class ShaderTest : public KiwiCore {
         
         // Load the shader
         shaderLayer->loadShader(shaderPathBuffer);
+        
+        // Initialize status bar widgets
+        setupStatusBar();
+        
+        // Set initial status
+        StatusBar::getInstance().setState(StatusBarState::Idle);
+        StatusBar::getInstance().setMessage("Ready");
+    }
+    
+    void setupStatusBar() {
+        auto& statusBar = StatusBar::getInstance();
+        
+        // Widget: Mouse Position (UV and Pixel coords)
+        statusBar.addWidget("mouse_pos", [this]() {
+            glm::vec2 mouseUV = shaderLayer->getMousePosition();
+            glm::vec2 resolution = frameSize();
+            glm::vec2 mousePixel = mouseUV * resolution;
+            
+            // Show UV coords (0-1 range)
+            ImGui::Text("UV: %.3f, %.3f", mouseUV.x, mouseUV.y);
+            ImGui::SameLine();
+            
+            // Show pixel coords
+            ImGui::Text("| Px: %.0f, %.0f", mousePixel.x, mousePixel.y);
+        });
+        
+        // Widget: Resolution
+        statusBar.addWidget("resolution", [this]() {
+            ImGui::Text("|");
+            ImGui::SameLine();
+            ImGui::Text("%.0fx%.0f", frameSize().x, frameSize().y);
+        });
+        
+        // Widget: Reload Button
+        statusBar.addWidget("reload_btn", [this]() {
+            ImGui::Text("|");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Reload Shader")) {
+                shaderLayer->forceReload();
+            }
+        });
     }
 
     void onUpdate(float time, float deltaTime) override {
@@ -83,13 +125,31 @@ class ShaderTest : public KiwiCore {
         // Add to recent list
         addToRecent(path);
         
+        // Update status bar
+        StatusBar::getInstance().setState(StatusBarState::Compiling);
+        StatusBar::getInstance().setMessage("Loading shader: " + std::filesystem::path(path).filename().string());
+        
         Logger::Info("ShaderTest", "Opening shader from file dialog: " + path, {"ui", "io"});
         shaderLayer->loadShader(path);
+        
+        // Update status based on result
+        updateShaderStatus();
     }
     
     void addToRecent(const std::string& path) {
         SettingsManager::getInstance().addRecentFile(path);
         SettingsManager::getInstance().setLastShader(path);
+    }
+    
+    void updateShaderStatus() {
+        if (shaderLayer->hasValidShader()) {
+            std::filesystem::path shaderPath(shaderLayer->getShaderPath());
+            StatusBar::getInstance().setState(StatusBarState::Success);
+            StatusBar::getInstance().setMessage("Shader: " + shaderPath.filename().string());
+        } else {
+            StatusBar::getInstance().setState(StatusBarState::Error);
+            StatusBar::getInstance().setMessage("Shader compilation failed");
+        }
     }
     
     void onUpdateUI() override {
@@ -237,8 +297,16 @@ class ShaderTest : public KiwiCore {
             std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
             strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
             addToRecent(path);
+            
+            // Update status bar
+            StatusBar::getInstance().setState(StatusBarState::Compiling);
+            StatusBar::getInstance().setMessage("Loading shader: " + std::string(shaderOptions[selectedShader]));
+            
             Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
             shaderLayer->loadShader(path);
+            
+            // Update status after load
+            updateShaderStatus();
         }
         
         ImGui::Separator();
@@ -340,8 +408,16 @@ class ShaderTest : public KiwiCore {
                         // Load this shader directly
                         strncpy(shaderPathBuffer, file.c_str(), sizeof(shaderPathBuffer) - 1);
                         shaderPathBuffer[sizeof(shaderPathBuffer) - 1] = '\0';
+                        
+                        // Update status bar
+                        StatusBar::getInstance().setState(StatusBarState::Compiling);
+                        StatusBar::getInstance().setMessage("Loading shader: " + filename);
+                        
                         shaderLayer->loadShader(file);
                         Logger::Info("ShaderTest", "Loaded shader from recent: " + filename, {"ui", "shader"});
+                        
+                        // Update status after load
+                        updateShaderStatus();
                     }
                     ImGui::PopID();
                     
