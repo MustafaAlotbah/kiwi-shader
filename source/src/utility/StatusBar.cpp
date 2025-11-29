@@ -47,13 +47,8 @@ void StatusBar::clearWidgets() {
 }
 
 ImVec4 StatusBar::getBackgroundColor() const {
-    switch (state_) {
-        case StatusBarState::Idle:      return ImVec4(0.0f, 0.0f, 0.0f, 1.0f);      // Black
-        case StatusBarState::Compiling: return ImVec4(0.0f, 0.2f, 0.4f, 1.0f);      // Dark blue
-        case StatusBarState::Error:     return ImVec4(0.4f, 0.0f, 0.0f, 1.0f);      // Dark red
-        case StatusBarState::Success:   return ImVec4(0.0f, 0.3f, 0.0f, 1.0f);      // Dark green
-        default:                        return ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
-    }
+    // Always dark gray
+    return ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
 }
 
 void StatusBar::render() {
@@ -90,37 +85,6 @@ void StatusBar::render() {
     if (ImGui::Begin("##StatusBar", nullptr, flags)) {
         // Left section: Status message
         ImGui::AlignTextToFramePadding();
-        
-        // Add state indicator icon
-        const char* stateIcon = "";
-        ImVec4 stateColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        
-        switch (state_) {
-            case StatusBarState::Idle:
-                stateIcon = "";
-                stateColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-                break;
-            case StatusBarState::Compiling:
-                stateIcon = "Compiling...";
-                stateColor = ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
-                break;
-            case StatusBarState::Error:
-                stateIcon = "Error";
-                stateColor = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
-                break;
-            case StatusBarState::Success:
-                stateIcon = "Success";
-                stateColor = ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
-                break;
-        }
-        
-        if (stateIcon[0] != '\0') {
-            ImGui::TextColored(stateColor, "%s", stateIcon);
-            ImGui::SameLine();
-            ImGui::TextDisabled("|");
-            ImGui::SameLine();
-        }
-        
         ImGui::Text("%s", message_.c_str());
         
         // Right section: Widgets (buttons, stats, etc.)

@@ -143,6 +143,103 @@ uniform vec3 iResolution;    // Viewport resolution (width, height, aspect)
 uniform vec4 iMouse;         // Mouse position and click state
 ```
 
+### 3D Camera System
+
+The framework includes an interactive 3D camera controller, perfect for exploring raymarched scenes. Camera uniforms are automatically provided to all shaders.
+
+**Camera Uniforms:**
+
+```glsl
+uniform vec3 uCameraPosition;    // Camera world position
+uniform vec3 uCameraForward;     // Normalized forward direction
+uniform vec3 uCameraRight;       // Normalized right direction
+uniform vec3 uCameraUp;          // Normalized up direction
+uniform vec3 uCameraTarget;      // Look-at target (position + forward)
+uniform mat4 uViewMatrix;        // View transformation matrix
+uniform mat4 uProjectionMatrix;  // Projection matrix
+uniform float uCameraFOV;        // Field of view in degrees
+uniform float uCameraNear;       // Near clipping plane
+uniform float uCameraFar;        // Far clipping plane
+```
+
+**Camera Controls:**
+
+| Input | Action |
+|-------|--------|
+| **W / Up Arrow** | Move forward |
+| **S / Down Arrow** | Move backward |
+| **A / Left Arrow** | Strafe left |
+| **D / Right Arrow** | Strafe right |
+| **Q / Space** | Move up |
+| **E / Ctrl** | Move down |
+| **Right Mouse + Drag** | Look around (rotate camera) |
+| **Left Mouse + Drag** | Pan camera |
+| **Mouse Scroll** | Zoom (adjust FOV) |
+| **Shift** | Sprint (2x movement speed) |
+
+**Example: Raymarching with Camera**
+
+```glsl
+#version 330 core
+
+uniform float iTime;
+uniform vec3 iResolution;
+
+// Camera uniforms (automatically provided)
+uniform vec3 uCameraPosition;
+uniform vec3 uCameraForward;
+uniform vec3 uCameraRight;
+uniform vec3 uCameraUp;
+
+// Scene SDF
+float sceneSDF(vec3 p) {
+    float sphere = length(p - vec3(0.0, 1.0, 0.0)) - 1.0;
+    float ground = p.y;
+    return min(sphere, ground);
+}
+
+// Raymarching
+float raymarch(vec3 ro, vec3 rd) {
+    float t = 0.0;
+    for (int i = 0; i < 100; i++) {
+        vec3 p = ro + rd * t;
+        float d = sceneSDF(p);
+        if (d < 0.001) return t;
+        if (t > 100.0) break;
+        t += d;
+    }
+    return -1.0;
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / iResolution.xy;
+    vec2 ndc = uv * 2.0 - 1.0;
+    ndc.x *= iResolution.x / iResolution.y;
+    
+    // Generate ray from camera
+    vec3 ro = uCameraPosition;
+    vec3 rd = normalize(
+        uCameraForward + 
+        ndc.x * uCameraRight * 0.8 + 
+        ndc.y * uCameraUp * 0.8
+    );
+    
+    // Raymarch and shade
+    float t = raymarch(ro, rd);
+    vec3 color = vec3(0.1, 0.1, 0.2); // Sky
+    
+    if (t > 0.0) {
+        vec3 p = ro + rd * t;
+        // Simple shading based on height
+        color = mix(vec3(0.2, 0.5, 0.2), vec3(0.8, 0.3, 0.2), p.y);
+    }
+    
+    gl_FragColor = vec4(color, 1.0);
+}
+```
+
+See `assets/shaders/camera_demo.frag` for a complete interactive camera example.
+
 ### Shader Library
 
 The `assets/shaders/common/` directory includes production-ready utilities:
@@ -212,6 +309,7 @@ Try loading the example shaders:
 - `assets/shaders/example_with_includes.frag` - Demonstrates the include system
 - `assets/shaders/annotated_demo.frag` - Demonstrates annotation controls
 - `assets/shaders/raymarching.frag` - Complex raymarched 3D scene
+- `assets/shaders/camera_demo.frag` - Interactive 3D camera with raymarching
 
 ## Architecture
 
@@ -220,7 +318,9 @@ Try loading the example shaders:
 - **ShaderPreprocessor**: Handles `#include` directive resolution, dependency tracking, and circular include detection
 - **UniformParser**: Extracts annotation comments and parses parameters using a custom lexer/parser
 - **UniformEditor**: Generates ImGui controls and binds uniform values to OpenGL shader programs
-- **ShaderLayer**: Manages shader lifecycle, hot-reloading, and file watching
+- **ShaderLayer**: Manages shader lifecycle, hot-reloading, GPU timing, and file watching
+- **CameraController**: Interactive 3D camera with FPS-style controls for scene exploration
+- **StatusBar**: VSCode-style status bar with GPU timing, mouse coordinates, and camera position
 - **AnnotationLexer/Parser**: Tokenizes and parses annotation syntax into structured data
 
 ## Examples
@@ -311,8 +411,8 @@ All dependencies are included as git submodules or source:
 - Compute shader support
 - Multi-pass rendering and render targets
 - Texture and uniform buffer support
-- Shader performance profiling
 - Export to standalone executable
+- Drag-and-drop overlay during file hover
 
 ## License
 

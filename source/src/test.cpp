@@ -22,12 +22,13 @@ class ShaderTest : public KiwiCore {
     // UI state
     char shaderPathBuffer[512] = "";
     int selectedShader = 0;
-    const char* shaderOptions[5] = {
+    const char* shaderOptions[6] = {
         "default.frag",
         "plasma.frag",
         "raymarching.frag",
         "annotated_demo.frag",
-        "example_with_includes.frag"
+        "example_with_includes.frag",
+        "camera_demo.frag"
     };
     bool showShaderParameters = true;
     bool showProject = true;
@@ -48,7 +49,7 @@ class ShaderTest : public KiwiCore {
             Logger::Info("ShaderTest", "Loading last shader: " + lastShader, {"app", "shader"});
             
             // Try to match with presets
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 6; ++i) {
                 if (lastShader.find(shaderOptions[i]) != std::string::npos) {
                     selectedShader = i;
                     break;
@@ -148,13 +149,30 @@ class ShaderTest : public KiwiCore {
                 
                 // Smart unit formatting: us for < 9ms, ms otherwise
                 if (gpuTime < 9.0) {
-                    double microSeconds = gpuTime * 1000.0; // Convert ms to μs
+                    double microSeconds = gpuTime * 1000.0; // Convert ms to us
                     ImGui::TextColored(color, "GPU: %.0f us", microSeconds);
                 } else {
                     ImGui::TextColored(color, "GPU: %.2f ms", gpuTime);
                 }
             } else {
                 ImGui::Text("GPU: --");
+            }
+        });
+        
+        // Widget: Camera Status and Position (for 3D navigation feedback)
+        statusBar.addWidget("camera_pos", [this]() {
+            ImGui::Text("|");
+            ImGui::SameLine();
+            
+            // Check if camera is supported
+            auto support = CameraController::checkShaderSupport(shaderLayer->getProgramId());
+            
+            if (support.hasAnySupport()) {
+                const auto& cam = shaderLayer->getCameraController().getState();
+                ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), 
+                    "Cam: %.1f, %.1f, %.1f", cam.position.x, cam.position.y, cam.position.z);
+            } else {
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No Camera");
             }
         });
         
@@ -176,7 +194,21 @@ class ShaderTest : public KiwiCore {
     }
 
     void onUpdate(float time, float deltaTime) override {
-        // ShaderLayer handles its own updates including hot-reload
+        // Update camera controller (keyboard input)
+        GLFWwindow* window = glfwGetCurrentContext();
+        shaderLayer->getCameraController().update(window, deltaTime);
+    }
+    
+    void onMouseButton(int button, int action, double x, double y) override {
+        shaderLayer->getCameraController().onMouseButton(button, action, x, y);
+    }
+    
+    void onMouseMove(double x, double y) override {
+        shaderLayer->getCameraController().onMouseMove(x, y);
+    }
+    
+    void onMouseScroll(double yOffset) override {
+        shaderLayer->getCameraController().onMouseScroll(yOffset);
     }
 
     void loadShaderFromMenu(const std::string& path) override {
@@ -220,7 +252,7 @@ class ShaderTest : public KiwiCore {
             StatusBar::getInstance().setMessage("Shader compilation failed");
         }
     }
-    
+
     void onUpdateUI() override {
         // ===== Shader Controls Window =====
         {
@@ -325,6 +357,75 @@ class ShaderTest : public KiwiCore {
                 ImGui::BulletText("iMouse - mouse state (vec4)");
                 ImGui::BulletText("fragCoord - UV coords [0,1]");
             }
+            
+            if (ImGui::CollapsingHeader("3D Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+                auto& cam = shaderLayer->getCameraController();
+                auto& state = cam.getState();
+                
+                // Check shader camera support
+                auto support = CameraController::checkShaderSupport(shaderLayer->getProgramId());
+                
+                // Show camera support status
+                if (support.hasAnySupport()) {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Camera Supported (%d uniforms)", support.countSupported());
+                    
+                    // Show which uniforms are used
+                    if (ImGui::TreeNode("Active Uniforms")) {
+                        if (support.position) ImGui::BulletText("uCameraPosition");
+                        if (support.forward) ImGui::BulletText("uCameraForward");
+                        if (support.right) ImGui::BulletText("uCameraRight");
+                        if (support.up) ImGui::BulletText("uCameraUp");
+                        if (support.target) ImGui::BulletText("uCameraTarget");
+                        if (support.viewMatrix) ImGui::BulletText("uViewMatrix");
+                        if (support.projectionMatrix) ImGui::BulletText("uProjectionMatrix");
+                        if (support.viewProjectionMatrix) ImGui::BulletText("uViewProjectionMatrix");
+                        if (support.fov) ImGui::BulletText("uCameraFOV");
+                        if (support.nearPlane) ImGui::BulletText("uCameraNear");
+                        if (support.farPlane) ImGui::BulletText("uCameraFar");
+                        ImGui::TreePop();
+                    }
+                } else {
+                    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Camera Not Supported");
+                    ImGui::TextWrapped("This shader doesn't use camera uniforms. Add uCameraPosition, uCameraForward, etc. to enable 3D navigation.");
+                }
+                
+                ImGui::Separator();
+                
+                // Position
+                ImGui::Text("Position:");
+                ImGui::DragFloat3("##CamPos", &state.position.x, 0.1f);
+                
+                // Rotation
+                ImGui::Text("Rotation:");
+                ImGui::SliderFloat("Pitch", &state.pitch, -89.0f, 89.0f);
+                ImGui::SliderFloat("Yaw", &state.yaw, -180.0f, 180.0f);
+                state.updateVectors(); // Update after manual changes
+                
+                // Speed
+                ImGui::Text("Settings:");
+                ImGui::SliderFloat("Move Speed", &state.moveSpeed, 0.5f, 20.0f);
+                ImGui::SliderFloat("Mouse Sens", &state.mouseSensitivity, 0.01f, 0.5f);
+                
+                // Enable/Disable
+                bool enabled = cam.isEnabled();
+                if (ImGui::Checkbox("Camera Enabled", &enabled)) {
+                    cam.setEnabled(enabled);
+                }
+                
+                // Reset button
+                if (ImGui::Button("Reset Camera")) {
+                    cam.reset();
+                }
+                
+                // Controls hint
+                ImGui::Separator();
+                ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Controls:");
+                ImGui::BulletText("WASD/Arrows - Move");
+                ImGui::BulletText("Right Mouse - Look");
+                ImGui::BulletText("Left Mouse - Pan");
+                ImGui::BulletText("Scroll - Zoom");
+                ImGui::BulletText("Shift - Sprint");
+            }
         }
         
         // ===== Project Window (separate) =====
@@ -362,7 +463,7 @@ class ShaderTest : public KiwiCore {
         
         // ===== Preset Shaders =====
         ImGui::Text("Preset Shaders:");
-        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
+        if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 6)) {
             std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
             strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
             addToRecent(path);

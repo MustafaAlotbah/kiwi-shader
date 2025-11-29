@@ -40,6 +40,7 @@ static bool should_exit = false;
 static bool show_shader_controls = true;
 static bool show_viewport = true;
 static bool show_logger = true;
+static bool viewport_hovered = false; // Track if mouse is over viewport for camera controls
 
 // Fullscreen state
 static bool is_fullscreen = false;
@@ -180,6 +181,9 @@ int main() {
     // Layer2D renderer;
     KiwiCore* app = KiwiAppFactory::getInstance().createApp("MyKiwiApp");
     app->onLoad();
+    
+    // Store app pointer in window for callbacks
+    glfwSetWindowUserPointer(window, app);
     
     // Initialize fullscreen quad renderer
     fullscreenQuad = new FullscreenQuad();
@@ -365,6 +369,9 @@ int main() {
                 /* Begin: Viewport Window */
                 if (show_viewport) {
                     ImGui::Begin("Viewport", &show_viewport);
+                    
+                    // Track if viewport is hovered for camera controls
+                    viewport_hovered = ImGui::IsWindowHovered();
 
                     ImVec2 windowSize = ImGui::GetContentRegionAvail();
                     ImVec2 windowPos = ImGui::GetWindowPos();
@@ -466,6 +473,41 @@ GLFWwindow *createGLFWWindow() {
             filePaths.emplace_back(paths[i]);
         }
         DragDropManager::getInstance().onDrop(filePaths);
+    });
+    
+    /* Set up mouse button callback for camera control */
+    glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods) {
+        // Only forward to camera if viewport is hovered (not other ImGui windows)
+        if (!viewport_hovered) return;
+        
+        // Get app and forward to camera
+        auto* app = static_cast<KiwiCore*>(glfwGetWindowUserPointer(window));
+        if (app) {
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            app->onMouseButton(button, action, mouseX, mouseY);
+        }
+    });
+    
+    /* Set up cursor position callback for camera control */
+    glfwSetCursorPosCallback(window, [](GLFWwindow* window, double xpos, double ypos) {
+        // Get app and forward to camera (always, for smooth dragging)
+        auto* app = static_cast<KiwiCore*>(glfwGetWindowUserPointer(window));
+        if (app) {
+            app->onMouseMove(xpos, ypos);
+        }
+    });
+    
+    /* Set up scroll callback for camera control */
+    glfwSetScrollCallback(window, [](GLFWwindow* window, double xoffset, double yoffset) {
+        // Only forward to camera if viewport is hovered
+        if (!viewport_hovered) return;
+        
+        // Get app and forward to camera
+        auto* app = static_cast<KiwiCore*>(glfwGetWindowUserPointer(window));
+        if (app) {
+            app->onMouseScroll(yoffset);
+        }
     });
 
     return window;

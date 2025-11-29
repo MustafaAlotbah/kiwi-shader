@@ -23,6 +23,7 @@
 #include "utility/UniformTypes.h"
 #include "utility/UniformParser.h"
 #include "utility/UniformEditor.h"
+#include "utility/CameraController.h"
 
 /**
  * @brief Result of a shader compilation attempt.
@@ -144,6 +145,12 @@ public:
      * @return GPU time to render the last frame (0.0 if not available yet)
      */
     [[nodiscard]] double getGpuFrameTime() const { return gpuFrameTime_; }
+    
+    /**
+     * @brief Get the 3D camera controller
+     */
+    CameraController& getCameraController() { return cameraController_; }
+    const CameraController& getCameraController() const { return cameraController_; }
 
 private:
     // Shader compilation
@@ -192,4 +199,7 @@ private:
     unsigned int gpuTimerQueries_[2] = {0, 0};  // Double-buffered queries to avoid stalls
     int currentQuery_ = 0;
     double gpuFrameTime_ = 0.0;  // In milliseconds
+    
+    // 3D camera controller
+    CameraController cameraController_;
 };

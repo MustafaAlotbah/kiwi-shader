@@ -318,6 +318,9 @@ void ShaderLayer::resetUniforms() {
 //------------------------------------------------------------------------------
 void ShaderLayer::render(float windowWidth, float windowHeight, double time, double deltaTime) {
     resolution_ = glm::vec2(windowWidth, windowHeight);
+    
+    // Update camera aspect ratio
+    cameraController_.setAspectRatio(windowWidth / windowHeight);
 
     // Check for hot reload
     checkAndReload();
@@ -372,6 +375,9 @@ void ShaderLayer::render(float windowWidth, float windowHeight, double time, dou
 
     // Bind custom annotated uniforms
     Uniforms::UniformEditor::bindUniforms(uniforms_, shaderProgram_);
+    
+    // Set camera uniforms (if shader uses them)
+    cameraController_.setShaderUniforms(shaderProgram_);
 
     // Draw fullscreen quad
     GL_TRY(glBindVertexArray(quadVAO_));
