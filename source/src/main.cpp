@@ -29,6 +29,7 @@
 #include "utility/Layer2D.h"
 #include "utility/Logger.h"
 #include "utility/SettingsManager.h"
+#include "utility/FullscreenQuad.h"
 
 // Global flags
 static bool should_exit = false;
@@ -38,8 +39,37 @@ static bool show_shader_controls = true;
 static bool show_viewport = true;
 static bool show_logger = true;
 
+// Fullscreen state
+static bool is_fullscreen = false;
+static int windowed_x = 100, windowed_y = 100;
+static int windowed_width = 1480, windowed_height = 960;
+static FullscreenQuad* fullscreenQuad = nullptr;
+
 // File to open (set by menu, processed in main loop)
 static std::string pending_file_to_open = "";
+
+/**
+ * @brief Toggle fullscreen mode using GLFW
+ */
+void toggleFullscreen(GLFWwindow* window) {
+    if (is_fullscreen) {
+        // Exit fullscreen - restore windowed mode
+        glfwSetWindowMonitor(window, nullptr, windowed_x, windowed_y, windowed_width, windowed_height, GLFW_DONT_CARE);
+        is_fullscreen = false;
+    } else {
+        // Enter fullscreen - save window state first
+        glfwGetWindowPos(window, &windowed_x, &windowed_y);
+        glfwGetWindowSize(window, &windowed_width, &windowed_height);
+        
+        // Get primary monitor
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        
+        // Go fullscreen
+        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        is_fullscreen = true;
+    }
+}
 
 /**
  * @brief Opens a Windows file dialog to select a shader file
@@ -148,148 +178,213 @@ int main() {
     // Layer2D renderer;
     KiwiCore* app = KiwiAppFactory::getInstance().createApp("MyKiwiApp");
     app->onLoad();
+    
+    // Initialize fullscreen quad renderer
+    fullscreenQuad = new FullscreenQuad();
+    if (!fullscreenQuad->initialize()) {
+        std::cerr << "Failed to initialize fullscreen quad renderer" << std::endl;
+    }
 
     /* Main Loop */
     while (!glfwWindowShouldClose(window) && !should_exit) {
-        /* Clear Buffer */
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        // Handle key input for fullscreen toggle (using GLFW directly for reliability)
+        static bool f11_was_pressed = false;
+        bool f11_pressed = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+        if (f11_pressed && !f11_was_pressed) {
+            toggleFullscreen(window);
+        }
+        f11_was_pressed = f11_pressed;
+        
+        static bool esc_was_pressed = false;
+        bool esc_pressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        if (is_fullscreen && esc_pressed && !esc_was_pressed) {
+            toggleFullscreen(window);
+        }
+        esc_was_pressed = esc_pressed;
+        
+        // Get current framebuffer size
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        
+        // =====================================================================
+        // FULLSCREEN MODE: Render framebuffer directly, skip ImGui
+        // =====================================================================
+        if (is_fullscreen) {
+            // Update and render the shader at fullscreen resolution
+            double time = glfwGetTime();
+            static double lastTime = time;
+            double delta = time - lastTime;
+            lastTime = time;
+            
+            app->onUpdate(time, delta);
+            app->renderFrame(display_w, display_h, time, delta);
+            
+            // Render the framebuffer to fullscreen using our quad renderer
+            fullscreenQuad->render((GLuint)(uintptr_t)app->getTextureId(), display_w, display_h);
+            
+            // Render minimal ImGui overlay for hint text
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            
+            // Transparent fullscreen overlay for hint
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(10, 10));
+            ImGui::SetNextWindowBgAlpha(0.3f);
+            ImGui::Begin("##fullscreen_hint", nullptr, 
+                ImGuiWindowFlags_NoDecoration | 
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_NoMove);
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.8f), "ESC to exit fullscreen | F11 to toggle");
+            ImGui::End();
+            
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
+        // =====================================================================
+        // WINDOWED MODE: Normal ImGui rendering
+        // =====================================================================
+        else {
+            /* Clear Buffer */
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Start new ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+            // Start new ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
-        // ImGui docking space
-        ImGui::DockSpaceOverViewport();
+            // ImGui docking space
+            ImGui::DockSpaceOverViewport();
 
-        /* Window Rendering */
-        {
-            /* Main menu bar */
-            if (ImGui::BeginMainMenuBar()) {
-                if (ImGui::BeginMenu("File")) {
-                    if (ImGui::MenuItem("Open...", "Ctrl+O")) {
-                        std::string filePath = openFileDialog(window);
-                        if (!filePath.empty()) {
-                            pending_file_to_open = filePath;
+            /* Window Rendering */
+            {
+                /* Main menu bar */
+                if (ImGui::BeginMainMenuBar()) {
+                    if (ImGui::BeginMenu("File")) {
+                        if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+                            std::string filePath = openFileDialog(window);
+                            if (!filePath.empty()) {
+                                pending_file_to_open = filePath;
+                            }
                         }
-                    }
-                    
-                    auto recentFiles = SettingsManager::getInstance().getRecentFiles();
-                    if (ImGui::BeginMenu("Open Recent", !recentFiles.empty())) {
-                        for (size_t i = 0; i < recentFiles.size(); ++i) {
-                            const auto& file = recentFiles[i];
-                            // Extract filename for display
-                            size_t lastSlash = file.find_last_of("/\\");
-                            std::string displayName = (lastSlash != std::string::npos) 
-                                ? file.substr(lastSlash + 1) 
-                                : file;
-                            
-                            if (ImGui::MenuItem(displayName.c_str())) {
-                                pending_file_to_open = file;
+                        
+                        auto recentFiles = SettingsManager::getInstance().getRecentFiles();
+                        if (ImGui::BeginMenu("Open Recent", !recentFiles.empty())) {
+                            for (size_t i = 0; i < recentFiles.size(); ++i) {
+                                const auto& file = recentFiles[i];
+                                // Extract filename for display
+                                size_t lastSlash = file.find_last_of("/\\");
+                                std::string displayName = (lastSlash != std::string::npos) 
+                                    ? file.substr(lastSlash + 1) 
+                                    : file;
+                                
+                                if (ImGui::MenuItem(displayName.c_str())) {
+                                    pending_file_to_open = file;
+                                }
+                                
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", file.c_str());
+                                }
                             }
                             
-                            if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("%s", file.c_str());
+                            ImGui::Separator();
+                            if (ImGui::MenuItem("Clear Recent Files")) {
+                                SettingsManager::getInstance().clearRecentFiles();
                             }
+                            
+                            ImGui::EndMenu();
                         }
                         
                         ImGui::Separator();
-                        if (ImGui::MenuItem("Clear Recent Files")) {
-                            SettingsManager::getInstance().clearRecentFiles();
-                        }
-                        
+                        if (ImGui::MenuItem("Exit", "Alt+F4")) should_exit = true;
                         ImGui::EndMenu();
                     }
                     
-                    ImGui::Separator();
-                    if (ImGui::MenuItem("Exit", "Alt+F4")) should_exit = true;
-                    ImGui::EndMenu();
+                    if (ImGui::BeginMenu("View")) {
+                        ImGui::MenuItem("Shader Controls", nullptr, &show_shader_controls);
+                        ImGui::MenuItem("Viewport", nullptr, &show_viewport);
+                        ImGui::MenuItem("Logger", nullptr, &show_logger);
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("Fullscreen", "F11")) {
+                            toggleFullscreen(window);
+                        }
+                        ImGui::EndMenu();
+                    }
+                    
+                    ImGui::EndMainMenuBar();
                 }
                 
-                if (ImGui::BeginMenu("View")) {
-                    ImGui::MenuItem("Shader Controls", nullptr, &show_shader_controls);
-                    ImGui::MenuItem("Viewport", nullptr, &show_viewport);
-                    ImGui::MenuItem("Logger", nullptr, &show_logger);
-                    ImGui::EndMenu();
+                // Process pending file open (from menu)
+                if (!pending_file_to_open.empty()) {
+                    app->loadShaderFromMenu(pending_file_to_open);
+                    SettingsManager::getInstance().addRecentFile(pending_file_to_open);
+                    SettingsManager::getInstance().setLastShader(pending_file_to_open);
+                    pending_file_to_open = "";
                 }
-                
-                ImGui::EndMainMenuBar();
+
+                /* Begin: Shader Controls Window */
+                if (show_shader_controls) {
+                    ImGui::Begin("Shader Controls", &show_shader_controls);
+                    
+                    app->onUpdateUI();
+
+                    ImGui::End();
+                }
+                /* End: Shader Controls Window */
+
+
+                /* Begin: Viewport Window */
+                if (show_viewport) {
+                    ImGui::Begin("Viewport", &show_viewport);
+
+                    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+                    ImVec2 windowPos = ImGui::GetWindowPos();
+                    ImVec2 mousePos = ImGui::GetMousePos();
+
+                    double time = ImGui::GetTime();
+                    double delta = 1.0 / ImGui::GetIO().Framerate;
+
+                    app->onUpdate(time, delta);
+                    app->renderFrame(windowSize.x, windowSize.y, time, delta);
+                    ImGui::Image((ImTextureID) app->getTextureId(), windowSize, ImVec2(0, 1), ImVec2(1, 0));
+
+                    app->pollEvents(
+                            glm::vec2(windowPos.x + 12-3, windowPos.y + 48 - 10),
+                            glm::vec2(mousePos.x, mousePos.y),
+                            getState());
+
+                    ImGui::End();
+                }
+                /* End: Viewport Window */
+
+                // Render the Logger window
+                if (show_logger) {
+                    Logger::onDraw();
+                }
             }
-            
-            // Process pending file open (from menu)
-            if (!pending_file_to_open.empty()) {
-                app->loadShaderFromMenu(pending_file_to_open);
-                SettingsManager::getInstance().addRecentFile(pending_file_to_open);
-                SettingsManager::getInstance().setLastShader(pending_file_to_open);
-                pending_file_to_open = "";
+
+            /* BEGIN: Render ImGui and handle multiple viewports */
+            {
+                ImGui::Render();
+                glViewport(0, 0, display_w, display_h);
+                glClear(GL_COLOR_BUFFER_BIT);
+
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+                // Handling multiple viewports
+                if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+                    GLFWwindow *backup_current_context = glfwGetCurrentContext();
+                    ImGui::UpdatePlatformWindows();
+                    ImGui::RenderPlatformWindowsDefault();
+                    glfwMakeContextCurrent(backup_current_context);
+                }
             }
-
-            /* Begin: Shader Controls Window */
-            if (show_shader_controls) {
-                ImGui::Begin("Shader Controls", &show_shader_controls);
-                
-                app->onUpdateUI();
-
-                ImGui::End();
-            }
-            /* End: Shader Controls Window */
-
-
-            /* Begin: Viewport Window */
-            if (show_viewport) {
-                ImGui::Begin("Viewport", &show_viewport);
-                // Do whatever you want here
-
-                ImVec2 windowSize =  ImGui::GetWindowSize();
-                ImVec2 windowPos = ImGui::GetWindowPos(); // Top-left corner of the image
-                ImVec2 mousePos = ImGui::GetMousePos();
-
-
-                windowSize.x -= 12;
-                windowSize.y -= 48;
-                double time = ImGui::GetTime();
-                double delta = 1.0 / ImGui::GetIO().Framerate;
-
-                app->onUpdate(time, delta);
-                app->renderFrame(windowSize.x, windowSize.y, time, delta);
-                ImGui::Image((ImTextureID) app->getTextureId(), windowSize, ImVec2(0, 1), ImVec2(1, 0));
-
-                app->pollEvents(
-                        glm::vec2(windowPos.x + 12-3, windowPos.y + 48 - 10),
-                        glm::vec2(mousePos.x, mousePos.y),
-                        getState());
-
-                ImGui::End();
-            }
-            /* End: Viewport Window */
-
-            // Render the Logger window
-            if (show_logger) {
-                Logger::onDraw();
-            }
+            /* END: Render ImGui and handle multiple viewports */
         }
-
-        /* BEGIN: Render ImGui and handle multiple viewports */
-        {
-
-            ImGui::Render();
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClear(GL_COLOR_BUFFER_BIT);
-
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            // Handling multiple viewports
-            if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-                GLFWwindow *backup_current_context = glfwGetCurrentContext();
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault(); // Crucial for multi-viewport
-                glfwMakeContextCurrent(backup_current_context);
-            }
-        }
-        /* END: Render ImGui and handle multiple viewports */
-
 
         /* Swap buffers and poll IO events */
         glfwSwapBuffers(window);
@@ -297,6 +392,9 @@ int main() {
     }
 
     // Cleanup
+    delete fullscreenQuad;
+    fullscreenQuad = nullptr;
+    
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
