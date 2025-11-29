@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
+#include <cstdio>
 
 namespace Uniforms {
 
@@ -49,7 +50,7 @@ void AnnotationParser::advance() {
 
 void AnnotationParser::expect(TokenType type, const std::string& message) {
     if (!match(type)) {
-        Logger::Error("Parser error: " + message + " (got '" + current().value + "')");
+        Logger::Error("AnnotationParser", "Parser error: " + message + " (got '" + current().value + "')", {"shader", "parser"});
         throw std::runtime_error(message);
     }
 }
@@ -69,7 +70,7 @@ ParamMap AnnotationParser::parseParams() {
     while (!check(TokenType::EndOfInput) && !check(TokenType::ParenClose)) {
         // Expect: identifier = value
         if (!check(TokenType::Identifier)) {
-            Logger::Warn("Expected parameter name, got: " + current().value);
+            Logger::Warn("AnnotationParser", "Expected parameter name, got: " + current().value, {"shader", "parser"});
             advance();
             continue;
         }
@@ -134,7 +135,7 @@ ParamValue AnnotationParser::parseValue() {
         return parseArray();
     }
     
-    Logger::Warn("Unexpected token in value: " + current().value);
+    Logger::Warn("AnnotationParser", "Unexpected token in value: " + current().value, {"shader", "parser"});
     advance();
     return std::string("");
 }
@@ -188,7 +189,7 @@ ParamValue AnnotationParser::parseHexColor() {
     expect(TokenType::Hash, "Expected '#' for hex color");
     
     if (!check(TokenType::Identifier) && !check(TokenType::Number)) {
-        Logger::Error("Expected hex digits after '#'");
+        Logger::Error("AnnotationParser", "Expected hex digits after '#'", {"shader", "parser"});
         return std::vector<double>{1.0, 1.0, 1.0};
     }
     
@@ -205,7 +206,7 @@ ParamValue AnnotationParser::parseHexColor() {
         sscanf(hex.c_str(), "%02x%02x%02x%02x", &r, &g, &b, &a);
     }
     else {
-        Logger::Warn("Invalid hex color format: #" + hex);
+        Logger::Warn("AnnotationParser", "Invalid hex color format: #" + hex, {"shader", "parser"});
     }
     
     return std::vector<double>{r / 255.0, g / 255.0, b / 255.0, a / 255.0};
@@ -219,7 +220,7 @@ ParamMap AnnotationParser::parse(const std::vector<Token>& tokens) {
     try {
         return parser.parseParams();
     } catch (const std::exception& e) {
-        Logger::Error("Annotation parse error: " + std::string(e.what()));
+        Logger::Error("AnnotationParser", "Parse error: " + std::string(e.what()), {"shader", "parser"});
         return {};
     }
 }

@@ -64,7 +64,7 @@ UniformCollection UniformParser::parse(const std::string& shaderSource) {
             uniform = parseVec(uniformType, uniformName, parsedParams);
         }
         else {
-            Logger::Warn("Unknown annotation type: @" + annotationType);
+            Logger::Warn("UniformParser", "Unknown annotation type: @" + annotationType, {"shader", "annotation"});
         }
         
         if (uniform.has_value()) {
@@ -72,7 +72,9 @@ UniformCollection UniformParser::parse(const std::string& shaderSource) {
         }
     }
     
-    Logger::Log("Parsed " + std::to_string(collection.size()) + " annotated uniforms");
+    if (!collection.empty()) {
+        Logger::Info("UniformParser", "Parsed " + std::to_string(collection.size()) + " annotated uniform(s)", {"shader", "annotation"});
+    }
     return collection;
 }
 
@@ -264,7 +266,7 @@ std::optional<UniformVariant> UniformParser::parseSlider(
         return u;
     }
     
-    Logger::Warn("@slider not supported for type: " + type);
+    Logger::Warn("UniformParser", "@slider not supported for type: " + type, {"shader", "annotation"});
     return std::nullopt;
 }
 
@@ -274,7 +276,7 @@ std::optional<UniformVariant> UniformParser::parseColor(
     const ParamMap& params
 ) {
     if (type != "vec3" && type != "vec4") {
-        Logger::Warn("@color requires vec3 or vec4 type");
+        Logger::Warn("UniformParser", "@color requires vec3 or vec4 type, got: " + type, {"shader", "annotation"});
         return std::nullopt;
     }
     
@@ -306,7 +308,7 @@ std::optional<UniformVariant> UniformParser::parseCheckbox(
 ) {
     // Note: GLSL doesn't have bool uniforms, we use int (0 or 1)
     if (type != "int" && type != "bool") {
-        Logger::Warn("@checkbox requires int or bool type");
+        Logger::Warn("UniformParser", "@checkbox requires int or bool type, got: " + type, {"shader", "annotation"});
         return std::nullopt;
     }
     
@@ -379,7 +381,7 @@ std::optional<UniformVariant> UniformParser::parseVec(
         return u;
     }
     
-    Logger::Warn("Unsupported vector type: " + type);
+    Logger::Warn("UniformParser", "Unsupported vector type: " + type, {"shader", "annotation"});
     return std::nullopt;
 }
 

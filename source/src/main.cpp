@@ -284,6 +284,9 @@ void initImGui(GLFWwindow *window) {
             (std::string(ASSETS_PATH) + "/fonts/OpenSans-Regular.ttf").c_str(),
             22.0f
     );
+    
+    // Load monospace font for Logger (Cascadia Code, Fira Code, etc.)
+    Logger::loadMonospaceFont();
 
     // Set ImGui style
     ImGui::StyleColorsDark();

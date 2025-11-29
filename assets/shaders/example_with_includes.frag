@@ -20,7 +20,7 @@ uniform float uColorShift;
 out vec4 fragColor;
 in vec2 fragCoord;
 
-void main() {
+void main() { 
     vec2 uv = fragCoord;
     
     // Aspect ratio correction

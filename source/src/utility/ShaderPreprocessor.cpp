@@ -21,7 +21,7 @@ PreprocessResult ShaderPreprocessor::process(const std::string& mainFilePath) {
     if (!std::filesystem::exists(mainFilePath)) {
         result.success = false;
         result.errorMessage = "Shader file not found: " + mainFilePath;
-        Logger::Error(result.errorMessage);
+        Logger::Error("ShaderPreprocessor", result.errorMessage, {"shader", "io"});
         return result;
     }
     
@@ -33,7 +33,7 @@ PreprocessResult ShaderPreprocessor::process(const std::string& mainFilePath) {
     if (!file.is_open()) {
         result.success = false;
         result.errorMessage = "Failed to open shader file: " + mainFilePath;
-        Logger::Error(result.errorMessage);
+        Logger::Error("ShaderPreprocessor", result.errorMessage, {"shader", "io"});
         return result;
     }
     
@@ -155,7 +155,7 @@ std::string ShaderPreprocessor::processRecursive(const std::string& source, cons
             if (includePath.empty()) {
                 errorMessage_ = "Invalid #include syntax at line " + std::to_string(lineNumber) + 
                                " in " + currentFile + ": " + line;
-                Logger::Error(errorMessage_);
+                Logger::Error("ShaderPreprocessor", errorMessage_, {"shader", "preprocessor"});
                 return "";
             }
             
@@ -165,7 +165,7 @@ std::string ShaderPreprocessor::processRecursive(const std::string& source, cons
             if (resolvedPath.empty()) {
                 errorMessage_ = "Include file not found: " + includePath + 
                                " (referenced in " + currentFile + " at line " + std::to_string(lineNumber) + ")";
-                Logger::Error(errorMessage_);
+                Logger::Error("ShaderPreprocessor", errorMessage_, {"shader", "preprocessor", "io"});
                 return "";
             }
             
@@ -176,7 +176,7 @@ std::string ShaderPreprocessor::processRecursive(const std::string& source, cons
             if (processedFiles_.find(normalizedPath) != processedFiles_.end()) {
                 errorMessage_ = "Circular include detected: " + includePath + 
                                " (in " + currentFile + " at line " + std::to_string(lineNumber) + ")";
-                Logger::Error(errorMessage_);
+                Logger::Error("ShaderPreprocessor", errorMessage_, {"shader", "preprocessor"});
                 return "";
             }
             
@@ -188,7 +188,7 @@ std::string ShaderPreprocessor::processRecursive(const std::string& source, cons
             std::string includedSource = loadFile(resolvedPath);
             if (includedSource.empty()) {
                 errorMessage_ = "Failed to read include file: " + resolvedPath;
-                Logger::Error(errorMessage_);
+                Logger::Error("ShaderPreprocessor", errorMessage_, {"shader", "preprocessor", "io"});
                 return "";
             }
             

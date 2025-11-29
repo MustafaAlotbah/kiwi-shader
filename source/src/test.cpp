@@ -27,12 +27,17 @@ class ShaderTest : public KiwiCore {
     void onLoad() override {
         addLayer(shaderLayer);
         
+        // Log startup with various levels
+        Logger::Info("ShaderTest", "Application started", {"app", "startup"});
+        Logger::Debug("ShaderTest", "Using assets path: " + std::string(ASSETS_PATH), {"app", "config"});
+        
         // Set default shader path - use the annotated demo to show off the feature
         std::string defaultPath = std::string(ASSETS_PATH) + "/shaders/annotated_demo.frag";
         strncpy(shaderPathBuffer, defaultPath.c_str(), sizeof(shaderPathBuffer) - 1);
         selectedShader = 3;  // annotated_demo.frag
         
         // Load the default shader
+        Logger::Info("ShaderTest", "Loading default shader", {"app", "shader"});
         shaderLayer->loadShader(shaderPathBuffer);
     }
 
@@ -50,6 +55,7 @@ class ShaderTest : public KiwiCore {
         if (ImGui::Combo("##preset", &selectedShader, shaderOptions, 5)) {
             std::string path = std::string(ASSETS_PATH) + "/shaders/" + shaderOptions[selectedShader];
             strncpy(shaderPathBuffer, path.c_str(), sizeof(shaderPathBuffer) - 1);
+            Logger::Info("ShaderTest", "Switching to preset: " + std::string(shaderOptions[selectedShader]), {"ui", "shader"});
             shaderLayer->loadShader(shaderPathBuffer);
         }
         
