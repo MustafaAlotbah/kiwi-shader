@@ -12,6 +12,7 @@
 #include "utility/Logger.h"
 #include "utility/SettingsManager.h"
 #include "utility/StatusBar.h"
+#include "utility/DragDropManager.h"
 
 // ShaderTest class - demonstrates the ShaderLayer with hot-reload and uniform controls
 class ShaderTest : public KiwiCore {
@@ -70,6 +71,46 @@ class ShaderTest : public KiwiCore {
         // Set initial status
         StatusBar::getInstance().setState(StatusBarState::Idle);
         StatusBar::getInstance().setMessage("Ready");
+        
+        // Setup drag-and-drop handlers
+        setupDragDropHandlers();
+    }
+    
+    void setupDragDropHandlers() {
+        auto& dragDrop = DragDropManager::getInstance();
+        
+        // Handler for GLSL shader files (.glsl, .frag, .vert, .comp, .geom, .tesc, .tese)
+        auto shaderHandler = [this](const DroppedFileInfo& file) -> bool {
+            Logger::Info("ShaderTest", "Loading shader from drag-drop: " + file.filename, {"dragdrop", "shader"});
+            
+            // Update status bar
+            StatusBar::getInstance().setState(StatusBarState::Compiling);
+            StatusBar::getInstance().setMessage("Loading shader: " + file.filename);
+            
+            // Load the shader
+            strncpy(shaderPathBuffer, file.path.c_str(), sizeof(shaderPathBuffer) - 1);
+            shaderPathBuffer[sizeof(shaderPathBuffer) - 1] = '\0';
+            shaderLayer->loadShader(file.path);
+            
+            // Add to recent files
+            addToRecent(file.path);
+            
+            // Update status based on result
+            updateShaderStatus();
+            
+            return true;
+        };
+        
+        // Register all shader extensions
+        dragDrop.registerHandler(".glsl", shaderHandler);
+        dragDrop.registerHandler(".frag", shaderHandler);
+        dragDrop.registerHandler(".vert", shaderHandler);
+        dragDrop.registerHandler(".comp", shaderHandler);
+        dragDrop.registerHandler(".geom", shaderHandler);
+        dragDrop.registerHandler(".tesc", shaderHandler);
+        dragDrop.registerHandler(".tese", shaderHandler);
+        
+        Logger::Info("ShaderTest", "Drag-and-drop handlers registered", {"dragdrop", "init"});
     }
     
     void setupStatusBar() {

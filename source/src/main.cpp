@@ -31,6 +31,7 @@
 #include "utility/SettingsManager.h"
 #include "utility/FullscreenQuad.h"
 #include "utility/StatusBar.h"
+#include "utility/DragDropManager.h"
 
 // Global flags
 static bool should_exit = false;
@@ -392,6 +393,9 @@ int main() {
                 
                 // Render the Status Bar (always at the bottom)
                 StatusBar::getInstance().render();
+                
+                // Render drag-drop overlay (always on top)
+                DragDropManager::getInstance().renderOverlay();
             }
 
             /* BEGIN: Render ImGui and handle multiple viewports */
@@ -453,6 +457,16 @@ GLFWwindow *createGLFWWindow() {
     
     /* Enable vsync (swap interval = 1) */
     glfwSwapInterval(1);
+    
+    /* Set up drag-and-drop callback */
+    glfwSetDropCallback(window, [](GLFWwindow* window, int count, const char** paths) {
+        std::vector<std::string> filePaths;
+        filePaths.reserve(count);
+        for (int i = 0; i < count; ++i) {
+            filePaths.emplace_back(paths[i]);
+        }
+        DragDropManager::getInstance().onDrop(filePaths);
+    });
 
     return window;
 }
