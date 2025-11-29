@@ -28,6 +28,7 @@
 
 #include "utility/Layer2D.h"
 #include "utility/Logger.h"
+#include "utility/SettingsManager.h"
 
 // Global flags
 static bool should_exit = false;
@@ -36,10 +37,6 @@ static bool should_exit = false;
 static bool show_shader_controls = true;
 static bool show_viewport = true;
 static bool show_logger = true;
-
-// Recent files
-static std::vector<std::string> recent_files;
-static const size_t MAX_RECENT_FILES = 10;
 
 // File to open (set by menu, processed in main loop)
 static std::string pending_file_to_open = "";
@@ -72,25 +69,6 @@ std::string openFileDialog(GLFWwindow* window) {
     }
     
     return "";
-}
-
-/**
- * @brief Adds a file to the recent files list
- */
-void addToRecentFiles(const std::string& path) {
-    // Remove if already exists
-    auto it = std::find(recent_files.begin(), recent_files.end(), path);
-    if (it != recent_files.end()) {
-        recent_files.erase(it);
-    }
-    
-    // Add to front
-    recent_files.insert(recent_files.begin(), path);
-    
-    // Trim to max size
-    if (recent_files.size() > MAX_RECENT_FILES) {
-        recent_files.resize(MAX_RECENT_FILES);
-    }
 }
 
 /**
@@ -196,9 +174,10 @@ int main() {
                         }
                     }
                     
-                    if (ImGui::BeginMenu("Open Recent", !recent_files.empty())) {
-                        for (size_t i = 0; i < recent_files.size(); ++i) {
-                            const auto& file = recent_files[i];
+                    auto recentFiles = SettingsManager::getInstance().getRecentFiles();
+                    if (ImGui::BeginMenu("Open Recent", !recentFiles.empty())) {
+                        for (size_t i = 0; i < recentFiles.size(); ++i) {
+                            const auto& file = recentFiles[i];
                             // Extract filename for display
                             size_t lastSlash = file.find_last_of("/\\");
                             std::string displayName = (lastSlash != std::string::npos) 
@@ -216,7 +195,7 @@ int main() {
                         
                         ImGui::Separator();
                         if (ImGui::MenuItem("Clear Recent Files")) {
-                            recent_files.clear();
+                            SettingsManager::getInstance().clearRecentFiles();
                         }
                         
                         ImGui::EndMenu();
@@ -240,7 +219,8 @@ int main() {
             // Process pending file open (from menu)
             if (!pending_file_to_open.empty()) {
                 app->loadShaderFromMenu(pending_file_to_open);
-                addToRecentFiles(pending_file_to_open);
+                SettingsManager::getInstance().addRecentFile(pending_file_to_open);
+                SettingsManager::getInstance().setLastShader(pending_file_to_open);
                 pending_file_to_open = "";
             }
 

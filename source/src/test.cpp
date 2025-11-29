@@ -10,6 +10,7 @@
 #include "utility/ShaderLayer.h"
 #include "utility/UniformEditor.h"
 #include "utility/Logger.h"
+#include "utility/SettingsManager.h"
 
 // ShaderTest class - demonstrates the ShaderLayer with hot-reload and uniform controls
 class ShaderTest : public KiwiCore {
@@ -28,8 +29,6 @@ class ShaderTest : public KiwiCore {
     };
     bool showShaderParameters = true;
     bool showProject = true;
-    std::vector<std::string> recentShaders;  // Local recent files list
-    static const size_t MAX_RECENT = 5;
 
     void onLoad() override {
         addLayer(shaderLayer);
@@ -38,13 +37,30 @@ class ShaderTest : public KiwiCore {
         Logger::Info("ShaderTest", "Application started", {"app", "startup"});
         Logger::Debug("ShaderTest", "Using assets path: " + std::string(ASSETS_PATH), {"app", "config"});
         
-        // Set default shader path - use the annotated demo to show off the feature
-        std::string defaultPath = std::string(ASSETS_PATH) + "/shaders/annotated_demo.frag";
-        strncpy(shaderPathBuffer, defaultPath.c_str(), sizeof(shaderPathBuffer) - 1);
-        selectedShader = 3;  // annotated_demo.frag
+        // Try to load last shader from settings
+        std::string lastShader = SettingsManager::getInstance().getLastShader();
         
-        // Load the default shader
-        Logger::Info("ShaderTest", "Loading default shader", {"app", "shader"});
+        if (!lastShader.empty() && std::filesystem::exists(lastShader)) {
+            // Load last used shader
+            strncpy(shaderPathBuffer, lastShader.c_str(), sizeof(shaderPathBuffer) - 1);
+            Logger::Info("ShaderTest", "Loading last shader: " + lastShader, {"app", "shader"});
+            
+            // Try to match with presets
+            for (int i = 0; i < 5; ++i) {
+                if (lastShader.find(shaderOptions[i]) != std::string::npos) {
+                    selectedShader = i;
+                    break;
+                }
+            }
+        } else {
+            // Set default shader path - use the annotated demo to show off the feature
+            std::string defaultPath = std::string(ASSETS_PATH) + "/shaders/annotated_demo.frag";
+            strncpy(shaderPathBuffer, defaultPath.c_str(), sizeof(shaderPathBuffer) - 1);
+            selectedShader = 3;  // annotated_demo.frag
+            Logger::Info("ShaderTest", "Loading default shader", {"app", "shader"});
+        }
+        
+        // Load the shader
         shaderLayer->loadShader(shaderPathBuffer);
     }
 
@@ -72,19 +88,8 @@ class ShaderTest : public KiwiCore {
     }
     
     void addToRecent(const std::string& path) {
-        // Remove if already exists
-        auto it = std::find(recentShaders.begin(), recentShaders.end(), path);
-        if (it != recentShaders.end()) {
-            recentShaders.erase(it);
-        }
-        
-        // Add to front
-        recentShaders.insert(recentShaders.begin(), path);
-        
-        // Trim to max size
-        if (recentShaders.size() > MAX_RECENT) {
-            recentShaders.resize(MAX_RECENT);
-        }
+        SettingsManager::getInstance().addRecentFile(path);
+        SettingsManager::getInstance().setLastShader(path);
     }
     
     void onUpdateUI() override {
@@ -339,10 +344,11 @@ class ShaderTest : public KiwiCore {
         }
         
         // ===== Recent Files Section =====
-        if (!recentShaders.empty()) {
+        auto recentFiles = SettingsManager::getInstance().getRecentFiles();
+        if (!recentFiles.empty()) {
             if (ImGui::CollapsingHeader("Recent Files")) {
-                for (size_t i = 0; i < recentShaders.size(); ++i) {
-                    const auto& file = recentShaders[i];
+                for (size_t i = 0; i < recentFiles.size(); ++i) {
+                    const auto& file = recentFiles[i];
                     std::filesystem::path filePath(file);
                     std::string filename = filePath.filename().string();
                     
@@ -360,6 +366,11 @@ class ShaderTest : public KiwiCore {
                     if (ImGui::IsItemHovered()) {
                         ImGui::SetTooltip("%s", file.c_str());
                     }
+                }
+                
+                ImGui::Spacing();
+                if (ImGui::Button("Clear Recent Files")) {
+                    SettingsManager::getInstance().clearRecentFiles();
                 }
             }
         }
