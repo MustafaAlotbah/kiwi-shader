@@ -477,15 +477,19 @@ GLFWwindow *createGLFWWindow() {
     
     /* Set up mouse button callback for camera control */
     glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods) {
-        // Only forward to camera if viewport is hovered (not other ImGui windows)
-        if (!viewport_hovered) return;
-        
-        // Get app and forward to camera
+        // Get app
         auto* app = static_cast<KiwiCore*>(glfwGetWindowUserPointer(window));
-        if (app) {
-            double mouseX, mouseY;
-            glfwGetCursorPos(window, &mouseX, &mouseY);
-            app->onMouseButton(button, action, mouseX, mouseY);
+        if (!app) return;
+        
+        double mouseX, mouseY;
+        glfwGetCursorPos(window, &mouseX, &mouseY);
+        
+        // RELEASE events must ALWAYS be forwarded (to restore cursor even if outside viewport)
+        // PRESS events only if viewport is hovered
+        if (action == GLFW_RELEASE) {
+            app->onMouseButton(button, action, mouseX, mouseY, window);
+        } else if (viewport_hovered) {
+            app->onMouseButton(button, action, mouseX, mouseY, window);
         }
     });
     

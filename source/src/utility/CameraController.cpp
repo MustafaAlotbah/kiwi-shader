@@ -99,7 +99,7 @@ void CameraController::handleKeyboardInput(GLFWwindow* window, double deltaTime)
     }
 }
 
-void CameraController::onMouseButton(int button, int action, double mouseX, double mouseY) {
+void CameraController::onMouseButton(int button, int action, double mouseX, double mouseY, GLFWwindow* window) {
     if (!enabled_) return;
     
     if (button == GLFW_MOUSE_BUTTON_RIGHT) {
@@ -108,8 +108,22 @@ void CameraController::onMouseButton(int button, int action, double mouseX, doub
             lastMouseX_ = mouseX;
             lastMouseY_ = mouseY;
             firstMouse_ = true;
+            
+            // Enable infinite mouse (Blender-style)
+            if (window) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                if (glfwRawMouseMotionSupported()) {
+                    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+                }
+            }
         } else if (action == GLFW_RELEASE) {
             rightButtonDown_ = false;
+            
+            // Restore cursor if no buttons held
+            if (!leftButtonDown_ && window) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+            }
         }
     }
     
@@ -119,8 +133,22 @@ void CameraController::onMouseButton(int button, int action, double mouseX, doub
             lastMouseX_ = mouseX;
             lastMouseY_ = mouseY;
             firstMouse_ = true;
+            
+            // Enable infinite mouse (Blender-style)
+            if (window) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                if (glfwRawMouseMotionSupported()) {
+                    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+                }
+            }
         } else if (action == GLFW_RELEASE) {
             leftButtonDown_ = false;
+            
+            // Restore cursor if no buttons held
+            if (!rightButtonDown_ && window) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+            }
         }
     }
 }

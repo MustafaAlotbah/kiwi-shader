@@ -199,8 +199,8 @@ class ShaderTest : public KiwiCore {
         shaderLayer->getCameraController().update(window, deltaTime);
     }
     
-    void onMouseButton(int button, int action, double x, double y) override {
-        shaderLayer->getCameraController().onMouseButton(button, action, x, y);
+    void onMouseButton(int button, int action, double x, double y, GLFWwindow* window) override {
+        shaderLayer->getCameraController().onMouseButton(button, action, x, y, window);
     }
     
     void onMouseMove(double x, double y) override {

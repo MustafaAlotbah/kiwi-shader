@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <map>
 
 namespace Uniforms {
 
@@ -28,6 +29,21 @@ static std::string trim(const std::string& str) {
 UniformCollection UniformParser::parse(const std::string& shaderSource) {
     UniformCollection collection;
     
+    // Find all @group("name") annotations and map their end positions
+    // A group only applies to the NEXT annotated uniform
+    std::map<size_t, std::string> groupEndPositions; // end position -> group name
+    std::regex groupRegex("//\\s*@group\\s*\\(\\s*\"([^\"]*)\"\\s*\\)", std::regex::ECMAScript);
+    
+    auto grpBegin = std::sregex_iterator(shaderSource.begin(), shaderSource.end(), groupRegex);
+    auto grpEnd = std::sregex_iterator();
+    
+    for (auto it = grpBegin; it != grpEnd; ++it) {
+        std::smatch match = *it;
+        size_t endPos = match.position() + match.length();
+        std::string groupName = match[1].str();
+        groupEndPositions[endPos] = groupName;
+    }
+    
     // Regex to find annotation comments followed by uniform declarations
     // Matches: // @annotation(...)\n uniform type name;
     std::regex annotationRegex(
@@ -40,11 +56,39 @@ UniformCollection UniformParser::parse(const std::string& shaderSource) {
     
     for (auto it = begin; it != end; ++it) {
         std::smatch match = *it;
+        size_t uniformPos = match.position();
+        
+        // Find the closest @group annotation that appears right before this uniform
+        // (within a small distance, e.g., only whitespace/newlines between them)
+        std::string uniformGroup = "";
+        for (const auto& [endPos, groupName] : groupEndPositions) {
+            // Check if group annotation ends right before this uniform (allowing whitespace)
+            if (endPos <= uniformPos) {
+                // Check if there's only whitespace between group end and uniform start
+                std::string between = shaderSource.substr(endPos, uniformPos - endPos);
+                // Remove whitespace and newlines
+                bool onlyWhitespace = true;
+                for (char c : between) {
+                    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+                        onlyWhitespace = false;
+                        break;
+                    }
+                }
+                if (onlyWhitespace) {
+                    uniformGroup = groupName;
+                }
+            }
+        }
         
         std::string annotationType = match[1].str();  // e.g., "slider"
         std::string params = match[2].str();          // e.g., "min=0.0, max=1.0"
         std::string uniformType = match[3].str();     // e.g., "float"
         std::string uniformName = match[4].str();     // e.g., "uSpeed"
+        
+        // Skip group annotations (they're handled separately)
+        if (annotationType == "group") {
+            continue;
+        }
         
         // Use the professional parser
         auto parsedParams = AnnotationParser::parse(params);
@@ -68,6 +112,11 @@ UniformCollection UniformParser::parse(const std::string& shaderSource) {
         }
         
         if (uniform.has_value()) {
+            // Assign the group (only if @group was directly before this annotation)
+            std::visit([&uniformGroup](auto& u) {
+                u.group = uniformGroup;
+            }, uniform.value());
+            
             collection.uniforms.push_back(uniform.value());
         }
     }

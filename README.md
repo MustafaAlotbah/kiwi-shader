@@ -99,6 +99,27 @@ uniform vec2 uOffset;
 uniform vec3 uDirection;
 ```
 
+#### Groups (Organization)
+```glsl
+// @group("Lighting")
+// @slider(min=0.0, max=1.0, default=0.5)
+uniform float uAmbient;
+
+// @group("Lighting")
+// @color(default=1.0,0.9,0.7)
+uniform vec3 uSunColor;
+
+// @group("Materials")
+// @slider(min=0.0, max=1.0, default=0.3)
+uniform float uRoughness;
+
+// No group - will appear ungrouped
+// @slider(min=0.0, max=1.0, default=0.5)
+uniform float uOther;
+```
+
+Groups organize uniforms into collapsible sections in the UI. Each `@group("Name")` annotation only applies to the immediately following uniform - place it directly before each uniform you want to group.
+
 **Example Shader:**
 
 See `assets/shaders/annotated_demo.frag` for a complete demonstration of the annotation system, or `assets/shaders/raymarching.frag` for a complex raymarching scene with numerous configurable parameters.
@@ -115,6 +136,7 @@ See `assets/shaders/annotated_demo.frag` for a complete demonstration of the ann
 | `@vec2` | `vec2` | `default`, `min`, `max`, `step` (optional) | 2-component drag control | `// @vec2(default=0.5,0.5)`<br>`uniform vec2 uOffset;` |
 | `@vec3` | `vec3` | `default`, `min`, `max`, `step` (optional) | 3-component drag control | `// @vec3(default=0.0,1.0,0.0)`<br>`uniform vec3 uDirection;` |
 | `@vec4` | `vec4` | `default`, `min`, `max`, `step` (optional) | 4-component drag control | `// @vec4(default=1.0,1.0,1.0,1.0)`<br>`uniform vec4 uParams;` |
+| `@group` | N/A | `"Group Name"` | Collapsible section header | `// @group("Lighting")`<br>(affects following uniforms) |
 
 **Parameter Details:**
 

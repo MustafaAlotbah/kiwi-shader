@@ -105,8 +105,9 @@ public:
      * @param action GLFW_PRESS or GLFW_RELEASE
      * @param mouseX Current mouse X position
      * @param mouseY Current mouse Y position
+     * @param window GLFW window (for cursor control, can be nullptr)
      */
-    void onMouseButton(int button, int action, double mouseX, double mouseY);
+    void onMouseButton(int button, int action, double mouseX, double mouseY, GLFWwindow* window = nullptr);
     
     /**
      * @brief Handle mouse movement

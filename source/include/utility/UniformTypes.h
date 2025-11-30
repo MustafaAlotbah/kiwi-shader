@@ -39,6 +39,7 @@ struct UniformBase {
     std::string name;           // Uniform variable name (e.g., "uSpeed")
     std::string displayName;    // Human-readable name (e.g., "Speed")
     std::string tooltip;        // Optional tooltip text
+    std::string group;          // Group name for UI organization (empty = ungrouped)
     ControlType controlType = ControlType::None;
     int location = -1;          // OpenGL uniform location (set at runtime)
     

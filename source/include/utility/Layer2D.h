@@ -573,7 +573,7 @@ public: // API overrides
     virtual void onUpdate(float time, float deltaTime) = 0;
     virtual void onUpdateUI() = 0;
     virtual void loadShaderFromMenu(const std::string& path) { /* Default: do nothing */ }
-    virtual void onMouseButton(int button, int action, double x, double y) { /* Default: do nothing */ }
+    virtual void onMouseButton(int button, int action, double x, double y, GLFWwindow* window) { /* Default: do nothing */ }
     virtual void onMouseMove(double x, double y) { /* Default: do nothing */ }
     virtual void onMouseScroll(double yOffset) { /* Default: do nothing */ }
 public:

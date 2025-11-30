@@ -5,17 +5,20 @@
 
 #include "utility/UniformEditor.h"
 #include <format>
+#include <map>
+#include <vector>
 
 namespace Uniforms {
 
 //------------------------------------------------------------------------------
-// Main render function using std::visit for variant handling
+// Main render function with group support
 //------------------------------------------------------------------------------
 bool UniformEditor::renderControls(UniformCollection& collection) {
     bool anyChanged = false;
     
-    for (auto& uniform : collection.uniforms) {
-        bool changed = std::visit([](auto& u) -> bool {
+    // Helper lambda to render a single uniform (has access to private members)
+    auto renderUniform = [](UniformVariant& uniform) -> bool {
+        return std::visit([](auto& u) -> bool {
             using T = std::decay_t<decltype(u)>;
             
             if constexpr (std::is_same_v<T, FloatUniform>) {
@@ -44,8 +47,44 @@ bool UniformEditor::renderControls(UniformCollection& collection) {
             }
             return false;
         }, uniform);
+    };
+    
+    // Organize uniforms by group (preserving order)
+    std::vector<std::string> groupOrder; // Track order of groups
+    std::map<std::string, std::vector<size_t>> groupedIndices; // Group name -> uniform indices
+    
+    for (size_t i = 0; i < collection.uniforms.size(); ++i) {
+        std::string groupName;
+        std::visit([&groupName](const auto& u) {
+            groupName = u.group;
+        }, collection.uniforms[i]);
         
-        anyChanged |= changed;
+        // Track group order (first occurrence)
+        if (groupedIndices.find(groupName) == groupedIndices.end()) {
+            groupOrder.push_back(groupName);
+        }
+        groupedIndices[groupName].push_back(i);
+    }
+    
+    // Render groups in order
+    for (const auto& groupName : groupOrder) {
+        const auto& indices = groupedIndices[groupName];
+        
+        if (groupName.empty()) {
+            // Ungrouped uniforms - render directly
+            for (size_t idx : indices) {
+                anyChanged |= renderUniform(collection.uniforms[idx]);
+            }
+        } else {
+            // Grouped uniforms - render in collapsible header
+            if (ImGui::CollapsingHeader(groupName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Indent(10.0f);
+                for (size_t idx : indices) {
+                    anyChanged |= renderUniform(collection.uniforms[idx]);
+                }
+                ImGui::Unindent(10.0f);
+            }
+        }
     }
     
     return anyChanged;
