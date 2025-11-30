@@ -169,8 +169,19 @@ class ShaderTest : public KiwiCore {
             
             if (support.hasAnySupport()) {
                 const auto& cam = shaderLayer->getCameraController().getState();
+                
+                // Calculate focal length from FOV (assuming 35mm full-frame sensor, 36mm width)
+                // focal_length = 18 / tan(fov/2)
+                float fovRad = glm::radians(cam.fov);
+                float focalLength = 18.0f / tan(fovRad * 0.5f);
+                
                 ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), 
                     "Cam: %.1f, %.1f, %.1f", cam.position.x, cam.position.y, cam.position.z);
+                ImGui::SameLine();
+                ImGui::Text("|");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.6f, 1.0f), 
+                    "%.0fmm (%.0f FOV)", focalLength, cam.fov);
             } else {
                 ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No Camera");
             }
